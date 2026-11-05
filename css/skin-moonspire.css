@@ -130,5 +130,27 @@
 [data-skin="moonspire"] .scan-status, [data-skin="moonspire"] .toast { background: rgba(15,21,29,.95); border: 1px solid var(--line); }
 [data-skin="moonspire"] .skin .thumb { background-position: 50% 0; }
 [data-skin="moonspire"] .cta span { line-height: 1.35; }
-[data-skin="moonspire"] .hero .ver { left: calc(50% + 122px); top: 128px; color: #cfd5dd; }
+[data-skin="moonspire"] .hero .ver { left: calc(50% + 150px); top: 132px; color: #cfd5dd; }
 [data-skin="moonspire"] .mver { border-top-color: rgba(176,186,200,.28); }
+
+/* Details from the later Moonlit screens */
+[data-skin="moonspire"] .empty img { width: 74px; }
+[data-skin="moonspire"] .lens { width: 112px; }
+[data-skin="moonspire"] .timerpop { width: 270px; padding: 12px; }
+[data-skin="moonspire"] .timerpop img { display: none; }
+[data-skin="moonspire"] .timerpop .list { gap: 0; }
+[data-skin="moonspire"] .timerpop .list .btn { border: 0; border-radius: 10px; background: none; box-shadow: none; }
+[data-skin="moonspire"] .timerpop .list .btn + .btn { border-top: 1px solid rgba(176,186,200,.28); border-radius: 0; }
+[data-skin="moonspire"] .mitem .ic { border: 0; background: none; font-size: 18px; }
+[data-skin="moonspire"] .mitem.danger .ic { color: var(--ruby); }
+[data-skin="moonspire"] .modal .btns .btn, [data-skin="moonspire"] .chip.on { color: #10151b; border-color: #eef0f3; background: var(--silver-bg); background-size: 100% 100%; box-shadow: inset 0 1px 0 #fff, 0 2px 5px rgba(0,0,0,.6); }
+[data-skin="moonspire"] .modal .btns .btn.ruby { color: #8e1a1e; }
+[data-skin="moonspire"] .tbtn.expired { color: #10151b; background: var(--silver-bg); background-size: 100% 100%; }
+[data-skin="moonspire"] .hero.small h1 { filter: drop-shadow(0 1px 1px #000) drop-shadow(0 2px 6px rgba(0,0,0,.95)); }
+[data-skin="moonspire"] .hero h1 { white-space: nowrap; }
+[data-skin="moonspire"] .pb-row { border: 1px solid var(--line); background: linear-gradient(180deg, #161e29, #0d131b); }
+[data-skin="moonspire"] .pb-row.pick.on { border: 2px solid #e6eaef; }
+[data-skin="moonspire"] .pb-tick { border-color: var(--line); color: #f1f3f6; }
+[data-skin="moonspire"] .hero.small h1.long.clear-left { padding-left: 0; }
+[data-skin="moonspire"] .hero h1.long { top: 98px; font-size: 56px; }
+[data-skin="moonspire"] .hero.small h1.long { top: 50px; font-size: 32px; }

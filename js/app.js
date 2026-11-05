@@ -1,9 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.4';
-import * as L from './lookup.js?v=1.4';
-import * as R from './recognition.js?v=1.4';
+import * as G from './core.js?v=1.6';
+import * as L from './lookup.js?v=1.6';
+import * as R from './recognition.js?v=1.6';
 
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.6';
+const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 // Every skin supplies the same art files. `dir` is where they live under assets/.
@@ -19,16 +20,23 @@ const S = {
   lastController: null,
   colorSeat: null,
   layers: [],
+  playerbase: load('stackside.playerbase', []),
   settings: { skin: DEFAULT_SKIN, keepAwake: true, vibrate: true, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
 const art = n => `assets/${skin().dir ? skin().dir + '/' : ''}${n}`;
+// A player counts towards the playerbase when their name matches a saved entry, ignoring case and spaces at the ends.
+const pbKey = name => String(name ?? '').trim().toLowerCase();
+const pbFind = name => S.playerbase.find(e => pbKey(e.name) === pbKey(name));
+const winPct = e => (e?.games ? `${Math.round(e.wins / e.games * 100)}%` : '–');
+const winLine = e => (e.games ? `${e.wins} ${e.wins === 1 ? 'win' : 'wins'} in ${e.games} ${e.games === 1 ? 'game' : 'games'}` : 'No games yet');
 const applySkin = () => { document.documentElement.dataset.skin = skin().id; };
 applySkin();
 function save() {
   try {
     localStorage.setItem('stackside.draft', JSON.stringify({ seats: S.draft.seats, playerCount: S.draft.playerCount, timerMinutes: S.draft.timerMinutes }));
     localStorage.setItem('stackside.settings', JSON.stringify(S.settings));
+    localStorage.setItem('stackside.playerbase', JSON.stringify(S.playerbase));
     if (S.game) localStorage.setItem('stackside.game', JSON.stringify(S.game)); else localStorage.removeItem('stackside.game');
   } catch { /* A private window can refuse storage. The game still works until the page closes. */ }
 }
@@ -57,6 +65,7 @@ const ic = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6.500 7l1 13h9l1-13"/>', image: '<rect x="3" y="5" width="18" height="14" rx="2"/><path class="f" d="M5 17l5-6 4 4 2.500-2.500L19 17z"/><circle class="f" cx="16" cy="9" r="1.500"/>',
   flag: '<path d="M6 21V4"/><path class="f" d="M6 4h12l-3 4 3 4H6z"/>', warn: '<path d="M12 4l9.500 16h-19zM12 10v4.500"/><circle class="f" cx="12" cy="17.500" r=".8"/>',
+  users: '<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.5-4 3-6 6.500-6s6 2 6.500 6M16 4.800a3.500 3.500 0 0 1 0 6.400M18 14.500c2 .8 3.200 2.700 3.500 5.500"/>',
   menu: '<path d="M4 6.500h16M4 12h16M4 17.500h16"/>', help: '<path d="M8.500 9a3.500 3.500 0 1 1 5.300 3c-1.200.7-1.800 1.400-1.800 2.700"/><circle class="f" cx="12" cy="18.500" r="1.300"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/>',
   check: '<path d="M5 12.500l4.500 4.500L19 7"/>', door: '<path d="M14 4H6v16h8M10 12h10M16.500 8.500L20 12l-3.500 3.500"/>',
@@ -68,8 +77,8 @@ const gem = (c, cls = '') => `<img class="gem ${cls}" src="${art(`gem-${c}.png`)
 const divider = `<div class="divider">${icon('star')}</div>`;
 const head = t => `<div class="head"><h2>${esc(t)}</h2>${divider}</div>`;
 const flourish = '<svg class="flourish" viewBox="0 0 150 22" aria-hidden="true"><path d="M0 11h62M88 11h62" stroke="currentColor" stroke-width="1.200"/><path fill="currentColor" d="M75 0l1.800 9.200L86 11l-9.200 1.800L75 22l-1.800-9.200L64 11l9.200-1.800z"/></svg>';
-const hero = ({ title = 'Stackside', small, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''}">
-  <h1 class="${title.length > 9 ? 'long' : ''}">${esc(title)}</h1>${flourish}${small ? '' : `<span class="ver">${VER}</span>`}
+const hero = ({ title = APP_NAME, small, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''}">
+  <h1 class="${title.length > 9 ? 'long' : ''} ${right && !left ? 'clear-left' : ''}">${esc(title)}</h1>${flourish}${title === APP_NAME ? `<span class="ver">${VER}</span>` : ''}
   ${left ? `<div class="nav l">${left}</div>` : ''}${right ? `<div class="nav r">${right}</div>` : ''}</header>`;
 const navBtn = (label, act, attrs = '') => `<button class="btn teal" data-act="${act}" ${attrs}>${esc(label)}</button>`;
 const foot = '<div class="foot"></div>';
@@ -84,12 +93,13 @@ const chipsHtml = (selected, act = 'pickController') => `<div class="chips">${S.
   `<button class="chip c-${p.color} ${selected === p.id ? 'on' : ''}" data-act="${act}" data-id="${p.id}" aria-pressed="${selected === p.id}">${gem(p.color)}<span>${esc(p.name)}</span></button>`).join('')}</div>`;
 
 // ---------- Screens ----------
+const seatPct = name => { const e = pbFind(name); return e?.games ? `${winPct(e)} wins` : ''; };
 function setupScreen() {
   const d = S.draft, g = S.game;
   const seats = Array.from({ length: d.playerCount }, (_, i) => {
     const s = d.seats[i];
     const row = `<div class="seat-row"><button class="gem-btn" data-act="pickColorSeat" data-i="${i}" aria-label="Change ${esc(G.seatName(d, i))}'s colour">${gem(s.color)}</button>
-      <input id="seat${i}" data-bind="seat" data-i="${i}" value="${esc(s.name)}" placeholder="Player ${i + 1}" maxlength="24" autocomplete="off" aria-label="Player ${i + 1} name"></div>`;
+      <input id="seat${i}" data-bind="seat" data-i="${i}" value="${esc(s.name)}" placeholder="Player ${i + 1}" maxlength="24" autocomplete="off" aria-label="Player ${i + 1} name"><span class="pb-pct" data-pct="${i}">${seatPct(s.name)}</span></div>`;
     return S.colorSeat === i ? row + `<div class="seat-colors">${G.COLORS.map(c => `<button class="${c === s.color ? 'on' : ''}" data-act="setColor" data-i="${i}" data-c="${c}" aria-label="${c}">${gem(c)}</button>`).join('')}</div>` : row;
   }).join('');
   const starter = d.startingSeat != null ? G.seatName(d, d.startingSeat) : 'Not chosen';
@@ -97,7 +107,7 @@ function setupScreen() {
     <div class="scroll">
       ${g ? `<div class="progress"><div><b>Game in progress</b><small>${esc(g.players.map(p => p.name).join(', '))}</small></div><button class="btn ember" data-act="resume">Resume</button></div>` : ''}
       <div class="sect"><div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
-      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div></div>
+      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div><button class="btn teal wide" data-act="openPlayerbaseLoad">${icon('users')} Load from playerbase</button></div>
       <div class="sect"><div class="group">${head('Shared timer')}
         <div class="presets">${[25, 50, 75, 100].map(m => `<button class="btn ${m === d.timerMinutes ? 'ember' : 'plain'}" data-act="setMinutes" data-m="${m}">${m}m</button>`).join('')}</div>
         <div class="row"><span class="label" id="minutesLabel">${d.timerMinutes} minutes</span><div class="stepper"><button data-act="stepMinutes" data-d="-1" aria-label="One minute less">${icon('minus')}</button><button data-act="stepMinutes" data-d="1" aria-label="One minute more">${icon('plus')}</button></div></div>
@@ -118,7 +128,7 @@ function panelHtml(seat) {
       <button class="press minus" data-press="-1" data-id="${p.id}" aria-label="Decrease ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('minus')}</span></button>
       <button class="press plus" data-press="1" data-id="${p.id}" aria-label="Increase ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('plus')}</span></button>
       <div class="seat-in" style="--pink:var(--ink-${p.color})">
-        <div class="pname">${flag}<span>${esc(p.name)}</span></div>
+        <div class="pname">${flag}<span>${esc(p.name)}</span>${pbFind(p.name)?.games ? `<small class="pb-win">${winPct(pbFind(p.name))}</small>` : ''}</div>
         <div class="life ${long}" data-life="${p.id}">${p.life}</div>
         <button class="pill" data-act="openCounters" data-id="${p.id}" aria-label="${esc(p.name)}'s counters: ${p.poison} poison, ${total} commander damage"><span>${icon('drop')}${p.poison}</span><span>${icon('shield')}${total}</span></button>
       </div>
@@ -250,10 +260,10 @@ function scanStatusHtml(l) {
 function aboutLayer() {
   const sect = (c, t, body) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box">${body}</div></div>`;
   return `<section class="sheet">${hero({ title: 'About', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about">
-    ${sect('crimson', 'What this app does', '<p>Stackside tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
-    ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stackside is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
-    ${sect('amber', 'Legal', '<p>Stackside is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
-    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall.</p>')}<p class="note center">Stackside ${VER}</p></div>${foot}</section>`;
+    ${sect('crimson', 'What this app does', '<p>Stack Track tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
+    ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stack Track is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
+    ${sect('amber', 'Legal', '<p>Stack Track is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
+    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall. Your playerbase and win records stay in this browser.</p>')}<p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
 }
 function starterLayer(l) {
   const e = l.entries[l.cycling ?? l.selected];
@@ -275,12 +285,13 @@ function menuLayer() {
   const item = (act, c, ic_, label, cls = '') => `<button class="mitem ${cls}" role="menuitem" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span>${label}</button>`;
   return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop" data-stop style="right:10px;width:270px;top:${y}px" role="menu">${frame}
     ${atTable ? item('backToSetup', 'o', 'sliders', 'Back to setup') : S.game ? item('resumeFromMenu', 'o', 'door', 'Resume game') : ''}
+    ${item('openPlayerbase', 't', 'users', 'Playerbase')}
     ${item('openDice', 'g', 'dice', 'Dice &amp; coin')}
     ${item('openGuide', 't', 'help', 'How to use')}
     ${item('openSettings', 't', 'gear', 'Settings')}
     ${item('openAbout', 'b', 'info', 'About')}
     ${S.game ? item('askEndGame', 'r', 'x', 'End game', 'danger') : ''}
-    <div class="mver">Stackside ${VER}</div>
+    <div class="mver">${APP_NAME} ${VER}</div>
 </div></div>`;
 }
 function settingsLayer() {
@@ -292,7 +303,7 @@ function settingsLayer() {
     <div class="group">${head('At the table')}<div class="card-box settings-box">
       ${sw('keepAwake', 'Keep screen awake', 'During a game')}
       ${'vibrate' in navigator ? sw('vibrate', 'Vibration', 'On life changes and when the stack resolves') : ''}
-    </div></div><p class="note center">Stackside ${VER}</p></div>${foot}</section>`;
+    </div></div><p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
 }
 function guideLayer() {
   const sect = (c, t, items) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box"><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div></div>`;
@@ -301,8 +312,33 @@ function guideLayer() {
     ${sect('sky', 'Counters', ['Tap the small pill on a panel for poison and commander damage.', 'You can rename a player from the same page.'])}
     ${sect('amber', 'Timer', ['Tap the timer to start or pause it.', 'Hold it to add or remove a minute, or to reset.'])}
     ${sect('forest', 'The stack', ['The newest item goes on top, and you resolve from the top down.', 'Swipe a row right to copy it or left to remove it.', 'Hold a row for more choices, or tap it for details.'])}
+    ${sect('rose', 'Win tracking', ['Save players in Playerbase from the menu, then load them on the setup screen.', 'A player counts when their name matches a saved one.', 'When you end a game, pick the winner to record it for everyone saved.'])}
     ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.'])}
     </div>${foot}</section>`;
+}
+const pbAddable = name => { const n = String(name ?? '').trim(); return n && !pbFind(n); };
+function playerbaseLayer(l) {
+  const loading = !!l.select;
+  const rows = S.playerbase.length ? [...S.playerbase].sort((a, b) => (b.wins / (b.games || 1)) - (a.wins / (a.games || 1)) || a.name.localeCompare(b.name)).map(e => {
+    const on = loading && l.select.includes(e.id);
+    const body = `<span class="pb-text"><b>${esc(e.name)}</b><small>${winLine(e)}</small></span><span class="pb-big">${winPct(e)}</span>`;
+    return loading
+      ? `<button class="pb-row pick ${on ? 'on' : ''}" role="checkbox" aria-checked="${on}" data-act="pbToggle" data-id="${e.id}"><span class="pb-tick">${on ? icon('check') : ''}</span>${body}</button>`
+      : `<div class="pb-row">${body}<button class="pb-del" data-act="pbAskDelete" data-id="${e.id}" aria-label="Remove ${esc(e.name)}">${icon('trash')}</button></div>`;
+  }).join('') : '<p class="note center">No players saved yet.</p>';
+  return `<section class="sheet">${hero({ title: 'Playerbase', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+    ${loading ? `<p class="note center">Choose 2 to ${G.MAX_PLAYERS} players for this game.</p>` : ''}
+    <div class="searchbar"><div class="box"><input id="pbName" data-bind="pbName" value="${esc(l.draftName ?? '')}" placeholder="Add a player" maxlength="24" autocomplete="off" aria-label="New player's name"></div><button class="btn teal" id="pbAdd" data-act="pbAdd" ${pbAddable(l.draftName) ? '' : 'disabled'}>Add</button></div>
+    <div class="group">${rows}</div>
+    </div>${loading ? `<div class="actions"><button class="cta mid" data-act="pbLoad" ${l.select.length >= 2 ? '' : 'disabled'}><span>${l.select.length >= 2 ? `Load ${l.select.length} players` : 'Choose at least 2'}</span></button></div>` : ''}${foot}</section>`;
+}
+function endGameLayer(l) {
+  const saved = S.game.players.filter(p => pbFind(p.name));
+  if (!saved.length) return modal('End this game?', 'Life totals, counters and the stack will be cleared.', `<button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">End game</button>`);
+  return `<div class="dim" data-act="pop"><div class="modal" data-stop role="dialog" aria-label="End this game?">${frame}${gem('crimson', 'top')}<h2>Who won?</h2>${divider}
+    <p>Pick the winner to record it for ${saved.length === 1 ? esc(saved[0].name) : `${saved.length} saved players`}. Life totals, counters and the stack will be cleared.</p>
+    ${chipsHtml(l.winner, 'pickWinner')}
+    <div class="btns"><button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">${l.winner ? 'End &amp; record' : 'End, no record'}</button></div></div></div>`;
 }
 function diceLayer(l) {
   return `<div class="dim" data-act="pop"><div class="modal" data-stop role="dialog" aria-label="Dice and coin">${frame}${gem('amber', 'top')}<h2>Dice &amp; coin</h2>${divider}
@@ -321,18 +357,22 @@ function rowMenuLayer(l) {
     <div class="note" style="text-align:center">Copy, controlled by…</div>${chipsHtml(null, 'copyFor')}
     <button class="btn teal" data-act="abilityFrom">${icon('bolt')} Add ability from this</button><button class="btn ruby" data-act="removeFromMenu">${icon('trash')} Remove from stack</button><button class="btn plain" data-act="pop">Cancel</button></div></div>`;
 }
+function pbDeleteLayer(l) {
+  const e = S.playerbase.find(x => x.id === l.id);
+  return modal(`Remove ${e?.name ?? 'player'}?`, 'Their win record will be deleted.', `<button class="btn teal" data-act="pop">Keep</button><button class="btn ruby" data-act="pbDelete">Remove</button>`);
+}
 const LAYERS = {
   counters: countersLayer, stack: stackLayer, detail: detailLayer, ability: abilityLayer, search: searchLayer, confirm: confirmLayer,
-  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
+  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
   replace: () => modal('Replace the game in progress?', 'Its life totals, counters and stack will be lost.', `<button class="cta mid" data-act="startForced"><span>Start new game</span></button><button class="btn teal" data-act="pop">Cancel</button>`, true),
-  endGame: () => modal('End this game?', 'Life totals, counters and the stack will be cleared.', `<button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">End game</button>`),
+  endGame: endGameLayer,
 };
 
 // ---------- Rendering ----------
 function draw() {
   const scrolls = S.layers.map((_, i) => app.querySelector(`.layer[data-i="${i}"] .scroll`)?.scrollTop ?? 0);
   const baseScroll = app.querySelector('.base .scroll')?.scrollTop ?? 0;
-  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'dice', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
+  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'dice', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
     S.layers.map((l, i) => `<div class="layer" data-i="${i}" ${i < S.layers.length - 1 ? 'inert' : ''}>${LAYERS[l.type](l)}</div>`).join('');
   S.layers.forEach((_, i) => { const el = app.querySelector(`.layer[data-i="${i}"] .scroll`); if (el) el.scrollTop = scrolls[i]; });
   const b = app.querySelector('.base .scroll'); if (b) b.scrollTop = baseScroll;
@@ -437,7 +477,43 @@ const A = {
   },
   resumeFromMenu() { S.layers = []; A.resume(); },
   askEndGame() { S.layers.pop(); push({ type: 'endGame' }); },
-  endGame() { S.game = null; S.screen = 'setup'; S.layers = []; draw(); },
+  pickWinner(d) { const l = top(); l.winner = l.winner === d.id ? null : d.id; draw(); },
+  endGame() {
+    const winner = top()?.winner;
+    if (winner) {
+      const counted = new Set(); // Two seats with one name still count once.
+      for (const p of S.game.players) {
+        const e = pbFind(p.name); if (!e || counted.has(e.id)) continue;
+        counted.add(e.id); e.games++; if (p.id === winner) e.wins++;
+      }
+    }
+    S.game = null; S.screen = 'setup'; S.layers = []; draw();
+  },
+  openPlayerbase() { S.layers.pop(); push({ type: 'playerbase', autofocus: 'pbName' }); },
+  openPlayerbaseLoad() {
+    const seated = S.draft.seats.slice(0, S.draft.playerCount).map(s => pbFind(s.name)?.id).filter(Boolean);
+    push({ type: 'playerbase', select: [...new Set(seated)] });
+  },
+  pbAdd() {
+    const l = top(), name = String(l.draftName ?? '').trim(); if (!pbAddable(name)) return;
+    const e = { id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now(), name, wins: 0, games: 0 };
+    S.playerbase.push(e); l.draftName = '';
+    if (l.select && l.select.length < G.MAX_PLAYERS) l.select.push(e.id);
+    l.autofocus = 'pbName'; draw();
+  },
+  pbToggle(d) {
+    const l = top(), i = l.select.indexOf(d.id);
+    if (i >= 0) l.select.splice(i, 1); else if (l.select.length < G.MAX_PLAYERS) l.select.push(d.id); else return;
+    draw();
+  },
+  pbLoad() {
+    const l = top(); if (l.select.length < 2) return;
+    G.setPlayerCount(S.draft, l.select.length);
+    l.select.forEach((id, i) => { S.draft.seats[i].name = S.playerbase.find(e => e.id === id).name; });
+    S.draft.startingSeat = null; S.colorSeat = null; S.layers.pop(); draw();
+  },
+  pbAskDelete(d) { push({ type: 'pbDelete', id: d.id }); },
+  pbDelete() { const l = top(); S.playerbase = S.playerbase.filter(e => e.id !== l.id); S.layers.pop(); draw(); },
   backToSetup() { S.layers = []; S.screen = 'setup'; draw(); },
   timerAdjust(d) { G.timerAdjust(S.game.timer, +d.d); S.game.timer.notified = false; tick(true); save(); },
   timerReset() { G.timerReset(S.game.timer); S.game.timer.notified = false; S.layers.pop(); draw(); },
@@ -611,7 +687,12 @@ document.addEventListener('submit', e => {
 let searchTimer;
 document.addEventListener('input', e => {
   const b = e.target.dataset.bind; const l = top();
-  if (b === 'seat') { S.draft.seats[+e.target.dataset.i].name = e.target.value; save(); return; }
+  if (b === 'seat') {
+    S.draft.seats[+e.target.dataset.i].name = e.target.value; save();
+    const tag = document.querySelector(`[data-pct="${e.target.dataset.i}"]`); if (tag) tag.textContent = seatPct(e.target.value);
+    return;
+  }
+  if (b === 'pbName') { l.draftName = e.target.value; const add = document.getElementById('pbAdd'); if (add) add.disabled = !pbAddable(l.draftName); return; }
   if (b === 'abilitySource' || b === 'abilityEffect') {
     l[b === 'abilitySource' ? 'source' : 'effect'] = e.target.value;
     document.getElementById('abilityAdd').disabled = !(l.source.trim() || l.effect.trim()); return;
