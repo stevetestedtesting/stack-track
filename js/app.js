@@ -655,7 +655,7 @@ function fit() {
 }
 addEventListener('resize', fit);
 // Fetch the art up front so screens don't paint in pieces.
-['illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)]
+['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)]
   .forEach(n => { new Image().src = 'assets/' + n; });
 fit(); draw();
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.screen === 'table') wake(); });

@@ -57,7 +57,7 @@ svg.solid { fill: currentColor; stroke: none; }
 .btn.ember { color: var(--cream); background: var(--sheen), linear-gradient(180deg, #cc5a20, #93300f); box-shadow: inset 0 0 0 1px rgba(60,10,0,.5), 0 2px 3px rgba(50,25,0,.35); }
 .btn.plain { color: var(--ink); background: linear-gradient(180deg, var(--parch-lift), var(--parch-edge)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.4), 0 1px 2px rgba(50,25,0,.25); }
 .btn.wide { width: 100%; }
-.cta { display: flex; align-items: center; justify-content: center; width: 100%; height: 68px; flex: none; color: #fbecc6; border-style: solid; border-width: 0 54px; border-image: url(../assets/cta-ruby.png) 0 135 fill / 0 54px round stretch; font: 600 25px/1 var(--display); font-variation-settings: 'SOFT' 100; text-shadow: 0 1px 2px rgba(0,0,0,.6); transition: transform .08s, filter .12s; }
+.cta { display: flex; align-items: center; justify-content: center; width: 100%; height: 68px; flex: none; color: #fbecc6; border-style: solid; border-width: 0 54px; border-image: url(../assets/cta-ruby.png) 0 135 fill / 0 54px round stretch; font: 600 clamp(19px, 5.8vw, 25px)/1 var(--display); font-variation-settings: 'SOFT' 100; text-shadow: 0 1px 2px rgba(0,0,0,.6); transition: transform .08s, filter .12s; }
 .cta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cta:active { transform: scale(.985); filter: brightness(.92); }
 .cta.mid { height: 58px; font-size: 21px; }
