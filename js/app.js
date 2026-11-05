@@ -1,10 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.8';
-import * as L from './lookup.js?v=1.8';
-import * as R from './recognition.js?v=1.8';
-import { createChance } from './dice.js?v=1.8';
+import * as G from './core.js?v=1.9';
+import * as L from './lookup.js?v=1.9';
+import * as R from './recognition.js?v=1.9';
+import { createChance } from './dice.js?v=1.9';
 
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -343,18 +343,25 @@ function endGameLayer(l) {
     <div class="btns"><button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">${l.winner ? 'End &amp; record' : 'End, no record'}</button></div></div></div>`;
 }
 const CHANCE = {
-  d6: { name: 'D6', go: 'Roll D6', again: 'Roll again', moving: 'Rolling', done: 'You rolled' },
-  d20: { name: 'D20', go: 'Roll D20', again: 'Roll again', moving: 'Rolling', done: 'You rolled' },
-  coin: { name: 'Coin', go: 'Toss coin', again: 'Toss again', moving: 'In the air', done: 'The coin lands' },
+  d6: { name: 'D6', tag: 'The classic', go: 'Cast the D6', again: 'Cast again', moving: 'Rolling', done: 'You rolled', settle: 'Let the dice settle', hint: 'Touch the die to cast', hintAgain: 'Tap the die to roll again', range: '1–6' },
+  d20: { name: 'D20', tag: 'The arcane', go: 'Cast the D20', again: 'Cast again', moving: 'Rolling', done: 'You rolled', settle: 'Let the dice settle', hint: 'Touch the die to cast', hintAgain: 'Tap the die to roll again', range: '1–20' },
+  coin: { name: 'Coin', tag: 'The omen', go: 'Flip the coin', again: 'Toss again', moving: 'In the air', done: 'The coin lands', settle: 'A little fate in motion', hint: 'Touch the coin to flip', hintAgain: 'Tap the coin to toss again', range: 'Heads / Tails' },
 };
 function diceLayer(l) {
-  const c = CHANCE[l.kind], off = l.busy ? 'disabled' : '';
-  return `<div class="dim" data-act="pop"><div class="modal chance" data-stop role="dialog" aria-label="Dice and coin">${frame}${gem('amber', 'top')}<h2>Chance Chamber</h2>
-    <div class="seg" role="radiogroup" aria-label="Choose what to roll">${Object.keys(CHANCE).map(k => `<button class="${k === l.kind ? 'on' : ''}" role="radio" aria-checked="${k === l.kind}" data-act="chanceKind" data-k="${k}" ${off}>${CHANCE[k].name}</button>`).join('')}</div>
-    <div class="chance-stage"><canvas id="chanceCanvas" aria-hidden="true"></canvas><button class="chance-surface" data-act="chanceRoll" aria-label="${c.go}" ${off}></button></div>
-    <div class="chance-out" role="status" aria-live="polite" aria-atomic="true"><small>${esc(l.busy ? c.moving : l.result != null ? c.done : 'Let fate decide')}</small><b class="${l.result != null && !l.busy ? 'reveal' : ''}">${esc(l.busy ? '…' : l.result ?? '–')}</b></div>
-    <button class="cta mid" data-act="chanceRoll" ${off}><span>${l.result != null || l.busy ? c.again : c.go}</span></button>
-    <button class="btn plain" data-act="pop">Done</button></div></div>`;
+  const c = CHANCE[l.kind], off = l.busy ? 'disabled' : '', landed = l.result != null && !l.busy;
+  return `<section class="sheet chance-sheet" role="dialog" aria-label="Dice and coin">
+    <header class="chance-top"><div class="chance-brand">✧ ${APP_NAME}</div>${navBtn('Done', 'pop')}</header>
+    <div class="chance-body">
+      <p class="chance-eyebrow">The ritual of chance</p>
+      <h2 class="chance-title">Fortune <em>takes shape.</em></h2>
+      <p class="chance-line">Silver edges. Obsidian hearts.<br>Cast a die, or let the moon decide.</p>
+      <div class="chance-kinds" role="radiogroup" aria-label="Choose what to roll">${Object.keys(CHANCE).map(k => `<button role="radio" aria-checked="${k === l.kind}" data-act="chanceKind" data-k="${k}" ${off}>${CHANCE[k].name}<span>${CHANCE[k].tag}</span></button>`).join('')}</div>
+      <div class="chance-stage"><canvas id="chanceCanvas" aria-hidden="true"></canvas><button class="chance-surface" data-act="chanceRoll" aria-label="${c.go}" ${off}></button></div>
+      <p class="chance-hint">${l.busy ? c.settle : l.result != null ? c.hintAgain : c.hint}</p>
+      <div class="chance-out" role="status" aria-live="polite" aria-atomic="true"><small>${esc(l.busy ? c.moving : l.result != null ? c.done : 'Awaiting your hand')}</small><b class="${landed ? 'reveal' : ''}">${esc(l.busy ? '…' : l.result ?? '—')}</b></div>
+      <button class="cta mid chance-go" data-act="chanceRoll" ${off}><span>${l.result != null || l.busy ? c.again : c.go}</span></button>
+      <div class="chance-foot"><span>Equal chance · ${c.range}</span><label><input type="checkbox" data-act="toggleSetting" data-k="reduceMotion" ${S.settings.reduceMotion ? 'checked' : ''} ${off}>Reduce motion</label></div>
+    </div></section>`;
 }
 function timerMenuLayer() {
   const d = G.clock(S.game.timer.duration);
@@ -382,7 +389,7 @@ const LAYERS = {
 function draw() {
   const scrolls = S.layers.map((_, i) => app.querySelector(`.layer[data-i="${i}"] .scroll`)?.scrollTop ?? 0);
   const baseScroll = app.querySelector('.base .scroll')?.scrollTop ?? 0;
-  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'dice', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
+  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
     S.layers.map((l, i) => `<div class="layer" data-i="${i}" ${i < S.layers.length - 1 ? 'inert' : ''}>${LAYERS[l.type](l)}</div>`).join('');
   S.layers.forEach((_, i) => { const el = app.querySelector(`.layer[data-i="${i}"] .scroll`); if (el) el.scrollTop = scrolls[i]; });
   const b = app.querySelector('.base .scroll'); if (b) b.scrollTop = baseScroll;
@@ -830,6 +837,7 @@ addEventListener('resize', fit);
 // Fetch the art up front so screens don't paint in pieces.
 const preloadArt = () => ['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)].forEach(n => { new Image().src = art(n); });
 preloadArt();
+if (skin().dir === 'moonspire') new Image().src = art('altar.jpg');
 fit(); draw();
 document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (S.screen === 'table') wake(); checkForUpdate(); });
 // Browsers can hold old copies of this site, and GitHub Pages lets them. Games are saved, so reloading loses nothing.

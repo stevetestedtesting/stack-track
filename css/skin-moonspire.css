@@ -161,3 +161,15 @@
 [data-skin="moonspire"] .credits a { color: #dfe6ef; }
 [data-skin="moonspire"] .about .card-box p { line-height: 1.4; }
 [data-skin="moonspire"] .about .btn.teal { align-self: stretch; }
+
+/* The moonlit altar behind Dice & coin */
+[data-skin="moonspire"] .chance-sheet { background: linear-gradient(#080e1750, #080e1790 30%, #080e17d8 62%, #080e17f0), url(../assets/moonspire/altar.jpg) 50% 0 / cover no-repeat, #080e17; }
+[data-skin="moonspire"] .chance-title { font: 400 40px/1.05 'Cormorant Garamond', Georgia, serif; color: #edf2fb; }
+[data-skin="moonspire"] .chance-title em { font-weight: 400; color: #aabfd9; }
+[data-skin="moonspire"] .chance-kinds button { border-color: #5d718c66; border-radius: 4px; background: #0c1521b0; color: #c9d6e7; }
+[data-skin="moonspire"] .chance-kinds button span { color: #8fa0b8; }
+[data-skin="moonspire"] .chance-kinds button[aria-checked=true] { border-color: #bdcde2; background: linear-gradient(145deg, #d9e3ef26, #9eb9d50b); box-shadow: inset 0 0 18px #a6c9f311, 0 0 20px #9ebadd0b, inset 0 -2px 0 #c6ddff; color: #f5f8fc; }
+[data-skin="moonspire"] .chance-go { height: 54px; border-radius: 4px; font: 650 14px/1 'Inter', sans-serif; letter-spacing: .04em; color: #172536; text-shadow: none; background: var(--silver-bg); background-size: 100% 100%; }
+[data-skin="moonspire"] .chance-go span::after { content: ' \2197\FE0E'; padding-left: 8px; }
+[data-skin="moonspire"] .chance-out b { color: #ebf3ff; text-shadow: 0 0 28px #a4caff33; }
+[data-skin="moonspire"] .chance-foot input { accent-color: #c1d2e8; }

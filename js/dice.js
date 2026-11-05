@@ -1,4 +1,4 @@
-// The animated die and coin, adapted from Steve's "Moonlit Dice and Coin" design. Draws only: the app owns the buttons and text.
+// The animated die and coin, adapted from Steve's "Moonlit Dice and Coin v2" design. Draws only: the app owns the buttons and text.
 
 const add = (a, b) => a.map((v, i) => v + b[i]);
 const mul = (a, s) => a.map(v => v * s);
@@ -13,8 +13,26 @@ function rotate(v, x, y, z) {
   return [a * Math.cos(z) - b * Math.sin(z), a * Math.sin(z) + b * Math.cos(z), c];
 }
 
-const CUBE_V = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
-const CUBE_F = [[4, 5, 6, 7], [1, 0, 3, 2], [0, 4, 7, 3], [5, 1, 2, 6], [3, 7, 6, 2], [0, 1, 5, 4]];
+// A beveled cube. The first six faces carry the pips; the rest are its silver edges and corners.
+const { CUBE_V, CUBE_F } = (() => {
+  const verts = [], faces = [], bevel = .82;
+  const face = vs => {
+    const nn = cross(add(vs[1], mul(vs[0], -1)), add(vs[2], mul(vs[0], -1)));
+    const c = vs.reduce((t, v) => add(t, v), [0, 0, 0]);
+    if (dot(nn, c) < 0) vs.reverse();
+    faces.push(vs.map(v => verts.push(v) - 1));
+  };
+  for (const [axis, sign] of [[2, 1], [2, -1], [0, -1], [0, 1], [1, 1], [1, -1]]) {
+    const uv = [0, 1, 2].filter(x => x !== axis);
+    face([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const q = [0, 0, 0]; q[axis] = sign; q[uv[0]] = u * bevel; q[uv[1]] = v * bevel; return q; }));
+  }
+  for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+    const k = 3 - a - b;
+    face([[1, bevel, -bevel], [1, bevel, bevel], [bevel, 1, bevel], [bevel, 1, -bevel]].map(([u, v, w]) => { const q = []; q[a] = u * sa; q[b] = v * sb; q[k] = w; return q; }));
+  }
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) face([[x, y * bevel, z * bevel], [x * bevel, y, z * bevel], [x * bevel, y * bevel, z]]);
+  return { CUBE_V: verts, CUBE_F: faces };
+})();
 const PIPS = {
   1: [[50, 50]], 2: [[27, 27], [73, 73]], 3: [[27, 27], [50, 50], [73, 73]], 4: [[27, 27], [73, 27], [27, 73], [73, 73]],
   5: [[27, 27], [73, 27], [50, 50], [27, 73], [73, 73]], 6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]],
@@ -44,7 +62,7 @@ const { ICO_V, ICO_F } = (() => {
 /** `reduced()` says whether to skip the motion. `onSettled(value)` runs when a roll lands. */
 export function createChance({ reduced, onSettled }) {
   let canvas = null, ctx = null, W = 300, H = 230, observer = null;
-  let kind = 'd6', busy = false, value = null, progress = 1, raf = 0;
+  let kind = 'd6', busy = false, value = null, progress = 1, raf = 0, timer = 0;
 
   function resize() {
     if (!canvas) return;
@@ -79,9 +97,26 @@ export function createChance({ reduced, onSettled }) {
     const side = moving ? (Math.cos(turns) > 0 ? 'Heads' : 'Tails') : (value ?? 'Heads');
     ctx.fillStyle = '#e8f1ff'; ctx.shadowColor = '#c7e2ff'; ctx.shadowBlur = 10;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `${R * .65}px Georgia`;
-    // The variation selector keeps phones from swapping these for emoji.
-    ctx.fillText(side === 'Heads' ? '☾︎' : '✦︎', 0, -8);
+    ctx.save();
+    ctx.translate(0, -9);
+    if (side === 'Heads') {
+      ctx.beginPath(); ctx.arc(0, 0, R * .36, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111f30';
+      ctx.beginPath(); ctx.arc(R * .18, -R * .10, R * .33, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8f1ff';
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(R * (.20 + i * .09), R * (-.23 + i * .21), 1.8, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = i * Math.PI / 8 - Math.PI / 2, r = i % 2 ? R * .08 : (i % 4 ? R * .22 : R * .40);
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, R * .46, 0, Math.PI * 2);
+      ctx.strokeStyle = '#8ba4c6'; ctx.lineWidth = .6; ctx.stroke();
+    }
+    ctx.restore();
     ctx.font = `${R * .18}px system-ui`;
     ctx.fillText(side.toUpperCase(), 0, R * .51);
     ctx.restore();
@@ -90,8 +125,8 @@ export function createChance({ reduced, onSettled }) {
   function drawDie(cx, cy, radius, moving, left) {
     const is20 = kind === 'd20', verts = is20 ? ICO_V : CUBE_V, faces = is20 ? ICO_F : CUBE_F;
     const sides = is20 ? 20 : 6;
-    const points = verts.map(v => rotate(v, (is20 ? 0 : -.46) + left * 11, (is20 ? 0 : .56) + left * 15, left * 8));
-    const scale = is20 ? radius : radius * .65;
+    const points = verts.map(v => rotate(v, (is20 ? 0 : -.46) + left * 11, (is20 ? 0 : .56) + left * 15, (is20 ? -.10 : 0) + left * 8));
+    const scale = is20 ? radius : radius * .72;
     const project = v => { const f = 8 / (8 - v[2]); return [cx + v[0] * scale * f, cy - v[1] * scale * f]; };
     const list = faces.map((f, i) => {
       const vs = f.map(j => points[j]);
@@ -109,9 +144,9 @@ export function createChance({ reduced, onSettled }) {
       const g = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
       g.addColorStop(0, `rgb(${19 + light * 35},${29 + light * 40},${43 + light * 48})`);
       g.addColorStop(1, '#080e18');
-      ctx.fillStyle = g; ctx.fill();
+      ctx.fillStyle = !is20 && face.i >= 6 ? '#91a3b9' : g; ctx.fill();
       ctx.strokeStyle = face.i === 0 && landed ? '#e5f2ff' : '#a7b8ce';
-      ctx.lineWidth = is20 ? 2 : 3;
+      ctx.lineWidth = is20 ? 1.4 : 1.3;
       ctx.shadowColor = '#afcfff';
       ctx.shadowBlur = face.i === 0 && landed ? 12 : 2;
       ctx.stroke();
@@ -119,20 +154,23 @@ export function createChance({ reduced, onSettled }) {
       const number = face.i === 0 ? (value ?? sides) : ((Number(value || 1) + face.i - 1) % sides) + 1;
       if (is20) {
         const area = Math.abs((ps[1][0] - ps[0][0]) * (ps[2][1] - ps[0][1]) - (ps[1][1] - ps[0][1]) * (ps[2][0] - ps[0][0]));
-        const center = ps.reduce((s, p) => [s[0] + p[0] / ps.length, s[1] + p[1] / ps.length], [0, 0]);
+        const center = ps.reduce((t, q) => [t[0] + q[0] / ps.length, t[1] + q[1] / ps.length], [0, 0]);
         ctx.save();
         ctx.fillStyle = '#eef5ff'; ctx.shadowColor = '#c5e0ff'; ctx.shadowBlur = landed ? 12 : 2;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = `${Math.max(8, Math.min(42, Math.sqrt(area) * .34))}px Georgia`;
         ctx.fillText(String(number), center[0], center[1]);
         ctx.restore();
-      } else {
+      } else if (face.i < 6) {
         const [a, b, , d] = ps;
         ctx.save();
         ctx.transform((b[0] - a[0]) / 100, (b[1] - a[1]) / 100, (d[0] - a[0]) / 100, (d[1] - a[1]) / 100, a[0], a[1]);
         for (const [u, v] of PIPS[number]) {
-          ctx.beginPath(); ctx.arc(u, v, 6, 0, Math.PI * 2);
-          ctx.fillStyle = '#e8f2ff'; ctx.shadowColor = '#c7e2ff'; ctx.shadowBlur = 8; ctx.fill();
+          ctx.beginPath(); ctx.arc(u, v, 6.4, 0, Math.PI * 2);
+          ctx.fillStyle = '#9fbedf'; ctx.shadowColor = '#8ab9ed'; ctx.shadowBlur = 3; ctx.fill();
+          ctx.strokeStyle = '#e4efff'; ctx.lineWidth = 1; ctx.stroke();
+          ctx.beginPath(); ctx.arc(u, v, 3.6, 0, Math.PI * 2);
+          ctx.fillStyle = '#eaf4ff'; ctx.fill();
         }
         ctx.restore();
       }
@@ -146,7 +184,7 @@ export function createChance({ reduced, onSettled }) {
     const left = moving ? Math.pow(1 - t, 3) : 0;
     const jump = moving ? -Math.sin(t * Math.PI) * 40 - Math.abs(Math.sin(t * Math.PI * 4)) * 12 * (1 - t) : 0;
     const cx = W / 2 + Math.sin(t * 12) * left * 45, cy = H / 2 + 5 + jump;
-    const radius = Math.min(W * .28, H * .34);
+    const radius = Math.min(W * .34, H * .34);
 
     ctx.save();
     ctx.translate(W / 2, H * .87); ctx.scale(1, .19);
@@ -182,14 +220,20 @@ export function createChance({ reduced, onSettled }) {
       if (busy) return;
       busy = true; value = result; progress = 0;
       const start = performance.now(), duration = reduced() ? 120 : 1350;
+      const finish = () => {
+        cancelAnimationFrame(raf); clearTimeout(timer);
+        progress = 1; busy = false; paint(); onSettled(value);
+      };
       const step = now => {
         progress = Math.min(1, (now - start) / duration);
-        if (progress === 1) { busy = false; paint(); onSettled(value); return; }
+        if (progress === 1) { finish(); return; }
         paint();
         raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);
+      // Browsers stop drawing frames for pages they aren't showing. A roll still has to land.
+      timer = setTimeout(finish, duration + 250);
     },
-    destroy() { cancelAnimationFrame(raf); observer?.disconnect(); busy = false; canvas = ctx = null; },
+    destroy() { cancelAnimationFrame(raf); clearTimeout(timer); observer?.disconnect(); busy = false; canvas = ctx = null; },
   };
 }

@@ -331,13 +331,28 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .modal .chips { position: relative; }
 .btn.wide { display: flex; }
 .hero.small h1.long.clear-left { padding-left: 0; }
-.modal.chance { padding-top: 22px; gap: 10px; }
-.chance-stage { height: 214px; margin: -2px 0 -8px; }
-.chance-stage canvas { display: block; width: 100%; height: 100%; }
+.chance-sheet { overflow-y: auto; scrollbar-width: none; }
+.chance-top { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 0; }
+.chance-brand { font: 600 19px/1 var(--text); }
+.chance-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 24px 20px; }
+.chance-eyebrow { flex: none; text-align: center; font-size: 10px; letter-spacing: .25em; text-transform: uppercase; color: var(--ink-soft); }
+.chance-title { flex: none; margin: 8px 0 6px; text-align: center; font: 600 30px/1.05 var(--display); white-space: nowrap; }
+.chance-title em { font-weight: 500; color: var(--ink-soft); }
+.chance-line { flex: none; text-align: center; font-size: 12px; line-height: 1.5; color: var(--ink-soft); margin-bottom: 14px; }
+.chance-kinds { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.chance-kinds button { position: relative; min-height: 58px; border: 1px solid var(--gold); border-radius: 6px; font: 600 21px/1 var(--text); background: rgba(255,250,232,.28); }
+.chance-kinds button span { display: block; margin-top: 5px; font: 500 8px/1 system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+.chance-kinds button[aria-checked=true] { border-color: var(--ember); box-shadow: inset 0 -3px 0 var(--ember); }
+.chance-stage { position: relative; flex: 1 1 250px; min-height: 170px; }
+.chance-stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .chance-surface { position: absolute; inset: 0; border-radius: 18px; }
 .chance-surface:disabled { opacity: 1; }
-.chance-out { display: flex; flex-direction: column; align-items: center; min-height: 66px; text-align: center; }
-.chance-out small { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
-.chance-out b { font: 600 40px/1.2 var(--text); font-variant-numeric: tabular-nums; }
-.chance-out b.reveal { animation: chanceReveal .5s ease-out; }
-@keyframes chanceReveal { from { opacity: 0; transform: translateY(8px) scale(.9); } }
+.chance-hint { flex: none; text-align: center; font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-soft); }
+.chance-out { flex: none; display: flex; flex-direction: column; align-items: center; min-height: 92px; padding-top: 10px; text-align: center; }
+.chance-out small { font-size: 10px; letter-spacing: .25em; text-transform: uppercase; color: var(--ink-soft); }
+.chance-out b { font: 600 48px/1.2 var(--text); font-variant-numeric: tabular-nums; }
+.chance-out b.reveal { animation: chanceReveal .55s cubic-bezier(.16, 1, .3, 1); }
+.chance-go { flex: none; }
+.chance-foot { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; min-height: 30px; font-size: 11px; color: var(--ink-soft); }
+.chance-foot label { display: flex; align-items: center; gap: 6px; min-height: 30px; cursor: pointer; }
+@keyframes chanceReveal { from { opacity: 0; transform: translateY(8px) scale(.93); } }
