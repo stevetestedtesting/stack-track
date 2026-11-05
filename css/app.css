@@ -118,10 +118,11 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .row .label { font-size: 17px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .round { width: 44px; height: 44px; border-radius: 50%; padding: 0; font-family: var(--display); font-size: 22px; }
 .round.info { background: var(--sheen), linear-gradient(180deg, var(--teal-lift), #0a3234); color: var(--gold-pale); border: 2px solid var(--gold); display: grid; place-items: center; }
+.round.info svg { font-size: 22px; }
 
 /* Table */
 .table { position: absolute; inset: 0; display: flex; flex-direction: column; background: url(../assets/teal.jpg) 0 0 / 64px; }
-.table-top { flex: none; height: 62px; background: url(../assets/table-top.jpg) 50% 100% / 100% auto no-repeat; margin-bottom: -2px; }
+.table-top { position: relative; flex: none; height: 62px; background: url(../assets/table-top.jpg) 50% 100% / 100% auto no-repeat; margin-bottom: -2px; }
 .table-bottom { flex: none; height: 50px; background: url(../assets/table-bottom.jpg) 50% 100% / 100% auto no-repeat; margin-top: 2px; }
 .table.n6 .table-top, .table.n5 .table-top { height: 46px; } .table.n6 .table-bottom, .table.n5 .table-bottom { height: 34px; }
 .rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 0 7px; }
@@ -294,3 +295,30 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .about .card-box { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .toast { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); padding: 8px 16px; border-radius: 14px; background: var(--parch); border: 1.5px solid var(--gold); box-shadow: 0 4px 10px rgba(0,0,0,.4); z-index: 50; font-weight: 600; font-size: 14px; max-width: 90%; text-align: center; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Menu, settings and small tools */
+.table-top .round { position: absolute; right: 10px; top: 8px; width: 42px; height: 42px; min-height: 0; z-index: 2; }
+.table.n5 .table-top .round, .table.n6 .table-top .round { width: 36px; height: 36px; top: 4px; }
+.table.n5 .table-top .round svg, .table.n6 .table-top .round svg { font-size: 19px; }
+.ic.g { background: linear-gradient(180deg, #c49a3a, #7d5a1b); } .ic.t { background: linear-gradient(180deg, #14565a, #0a3234); }
+.skins { display: flex; flex-direction: column; gap: 10px; }
+.skin { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; text-align: left; color: var(--ink); border: 1.5px solid var(--gold); border-radius: 18px; background: rgba(255,250,232,.3); box-shadow: inset 0 0 0 2px rgba(255,250,232,.35); }
+.skin.on { border-width: 2.5px; border-color: var(--ember); background: rgba(255,250,232,.65); }
+.skin .thumb { flex: none; width: 86px; height: 60px; border-radius: 11px; border: 1.5px solid var(--gold); background: 50% 40% / cover no-repeat; }
+.skin .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.skin b { font: 700 18px/1.2 var(--text); }
+.skin small { font-size: 13px; line-height: 1.25; color: var(--ink-soft); }
+.skin .tick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; color: var(--ember); font-size: 24px; }
+.settings-box { padding-block: 4px; }
+.settings-box .switchrow { min-height: 54px; }
+.settings-box .switchrow + .switchrow { border-top: 1px solid rgba(200,152,60,.45); }
+.switchrow span small { display: block; font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+.guide ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+.rollout { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 92px; justify-content: center; }
+.rollout b { font: 700 58px/1 var(--display); color: var(--ruby); font-variant-numeric: tabular-nums; }
+.rollout b.word { font-size: 42px; }
+.rollout small { font-size: 14px; color: var(--ink-soft); }
+.modal .btns.three { grid-template-columns: 1fr 1fr 1fr; }
+.modal .btns.three .btn { padding: 0 6px; }
+.sect { display: contents; }
+.starter .hot em { display: none; font-style: normal; }

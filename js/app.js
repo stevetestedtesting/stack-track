@@ -4,6 +4,12 @@ import * as L from './lookup.js';
 import * as R from './recognition.js';
 
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+// Every skin supplies the same art files. `dir` is where they live under assets/.
+const SKINS = [
+  { id: 'moonspire', name: 'Moonspire', blurb: 'Moonlit castle, dark glass and brushed silver.', dir: 'moonspire' },
+  { id: 'fernhollow', name: 'Fernhollow', blurb: 'Storybook forest, parchment and antique gold.', dir: '' },
+];
+const DEFAULT_SKIN = 'moonspire';
 const S = {
   draft: { ...G.makeDraft(), ...load('stackside.draft', {}), startingSeat: null },
   game: load('stackside.game', null),
@@ -11,10 +17,16 @@ const S = {
   lastController: null,
   colorSeat: null,
   layers: [],
+  settings: { skin: DEFAULT_SKIN, keepAwake: true, vibrate: true, ...load('stackside.settings', {}) },
 };
+const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
+const art = n => `assets/${skin().dir ? skin().dir + '/' : ''}${n}`;
+const applySkin = () => { document.documentElement.dataset.skin = skin().id; };
+applySkin();
 function save() {
   try {
     localStorage.setItem('stackside.draft', JSON.stringify({ seats: S.draft.seats, playerCount: S.draft.playerCount, timerMinutes: S.draft.timerMinutes }));
+    localStorage.setItem('stackside.settings', JSON.stringify(S.settings));
     if (S.game) localStorage.setItem('stackside.game', JSON.stringify(S.game)); else localStorage.removeItem('stackside.game');
   } catch { /* A private window can refuse storage. The game still works until the page closes. */ }
 }
@@ -22,7 +34,7 @@ function save() {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const app = document.getElementById('app'), stage = document.getElementById('stage');
 const top = () => S.layers[S.layers.length - 1];
-const buzz = ms => { try { navigator.vibrate?.(ms); } catch { /* optional */ } };
+const buzz = ms => { if (!S.settings.vibrate) return; try { navigator.vibrate?.(ms); } catch { /* optional */ } };
 
 // ---------- Icons (drawn for this app) ----------
 const ic = {
@@ -43,11 +55,14 @@ const ic = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6.500 7l1 13h9l1-13"/>', image: '<rect x="3" y="5" width="18" height="14" rx="2"/><path class="f" d="M5 17l5-6 4 4 2.500-2.500L19 17z"/><circle class="f" cx="16" cy="9" r="1.500"/>',
   flag: '<path d="M6 21V4"/><path class="f" d="M6 4h12l-3 4 3 4H6z"/>', warn: '<path d="M12 4l9.500 16h-19zM12 10v4.500"/><circle class="f" cx="12" cy="17.500" r=".8"/>',
+  menu: '<path d="M4 6.500h16M4 12h16M4 17.500h16"/>', help: '<path d="M8.500 9a3.500 3.500 0 1 1 5.300 3c-1.200.7-1.800 1.400-1.800 2.700"/><circle class="f" cx="12" cy="18.500" r="1.300"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/>',
+  check: '<path d="M5 12.500l4.500 4.500L19 7"/>', door: '<path d="M14 4H6v16h8M10 12h10M16.500 8.500L20 12l-3.500 3.500"/>',
   star: '<path fill="currentColor" stroke="none" d="M12 0l1.700 9.300L24 12l-10.300 2.700L12 24l-1.700-9.300L0 12l10.300-2.700z"/>',
 };
 const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ic[n]}</svg>`;
 document.head.insertAdjacentHTML('beforeend', '<style>svg.i .f{fill:currentColor;stroke:none}</style>');
-const gem = (c, cls = '') => `<img class="gem ${cls}" src="assets/gem-${c}.png" alt="">`;
+const gem = (c, cls = '') => `<img class="gem ${cls}" src="${art(`gem-${c}.png`)}" alt="">`;
 const divider = `<div class="divider">${icon('star')}</div>`;
 const head = t => `<div class="head"><h2>${esc(t)}</h2>${divider}</div>`;
 const flourish = '<svg class="flourish" viewBox="0 0 150 22" aria-hidden="true"><path d="M0 11h62M88 11h62" stroke="currentColor" stroke-width="1.200"/><path fill="currentColor" d="M75 0l1.800 9.200L86 11l-9.200 1.800L75 22l-1.800-9.200L64 11l9.200-1.800z"/></svg>';
@@ -76,18 +91,18 @@ function setupScreen() {
     return S.colorSeat === i ? row + `<div class="seat-colors">${G.COLORS.map(c => `<button class="${c === s.color ? 'on' : ''}" data-act="setColor" data-i="${i}" data-c="${c}" aria-label="${c}">${gem(c)}</button>`).join('')}</div>` : row;
   }).join('');
   const starter = d.startingSeat != null ? G.seatName(d, d.startingSeat) : 'Not chosen';
-  return `<section class="sheet">${hero({ right: `<button class="btn round info" data-act="openAbout" aria-label="About Stackside">i</button>` })}
+  return `<section class="sheet">${hero({ right: `<button class="btn round info" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
     <div class="scroll">
       ${g ? `<div class="progress"><div><b>Game in progress</b><small>${esc(g.players.map(p => p.name).join(', '))}</small></div><button class="btn ember" data-act="resume">Resume</button></div>` : ''}
-      <div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
-      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div>
-      <div class="group">${head('Shared timer')}
+      <div class="sect"><div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
+      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div></div>
+      <div class="sect"><div class="group">${head('Shared timer')}
         <div class="presets">${[25, 50, 75, 100].map(m => `<button class="btn ${m === d.timerMinutes ? 'ember' : 'plain'}" data-act="setMinutes" data-m="${m}">${m}m</button>`).join('')}</div>
         <div class="row"><span class="label" id="minutesLabel">${d.timerMinutes} minutes</span><div class="stepper"><button data-act="stepMinutes" data-d="-1" aria-label="One minute less">${icon('minus')}</button><button data-act="stepMinutes" data-d="1" aria-label="One minute more">${icon('plus')}</button></div></div>
-      </div>
-      <div class="group">${head('Starting player')}
+      </div></div>
+      <div class="sect"><div class="group">${head('Starting player')}
         <div class="row"><span class="label">${esc(starter)}</span><button class="btn teal" data-act="pickDraftStarter">${icon('dice')} ${d.startingSeat != null ? 'Pick again' : 'Pick randomly'}</button></div>
-      </div>
+      </div></div>
     </div>
     <div class="actions"><button class="cta" data-act="start"><span>Start game at ${G.STARTING_LIFE} life</span></button></div>${foot}</section>`;
 }
@@ -96,7 +111,7 @@ function panelHtml(seat) {
   const g = S.game, p = g.players[seat.index], total = G.commanderTotal(p);
   const flag = g.startingPlayerId === p.id ? icon('flag') : '';
   const long = String(p.life).length > 2 ? 'long' : '';
-  return `<div class="panel c-${p.color}">${frame}<img class="pgem" src="assets/gem-${p.color}.png" alt="">
+  return `<div class="panel c-${p.color}">${frame}<img class="pgem" src="${art(`gem-${p.color}.png`)}" alt="">
     <div class="seat ${seat.orientation}">
       <button class="press minus" data-press="-1" data-id="${p.id}" aria-label="Decrease ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('minus')}</span></button>
       <button class="press plus" data-press="1" data-id="${p.id}" aria-label="Increase ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('plus')}</span></button>
@@ -112,12 +127,11 @@ function stripHtml() {
   return `<div class="strip" id="strip">
     <button class="tbtn timer" id="timerBtn" data-timer aria-label="Shared timer. Tap to start or pause, hold for more."><span id="timerIcon" style="display:contents"></span><span id="timerLabel"></span></button>
     <button class="tbtn" data-act="pickGameStarter" aria-label="Pick a starting player">${icon('dice')}</button>
-    <button class="tbtn ${n ? 'has' : ''}" data-act="openStack" aria-label="Stack, ${n} items">${icon('layers')}${n}</button>
-    <button class="tbtn" data-act="openGameMenu" aria-label="Game menu">${icon('dots')}</button></div>`;
+    <button class="tbtn ${n ? 'has' : ''}" data-act="openStack" aria-label="Stack, ${n} items">${icon('layers')}${n}</button></div>`;
 }
 function tableScreen() {
   const n = S.game.players.length, rows = G.tableRows(n), mid = Math.floor(rows.length / 2);
-  return `<div class="table n${n}"><div class="table-top"></div><div class="rows">${rows.map((row, i) =>
+  return `<div class="table n${n}"><div class="table-top"><button class="btn round info" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button></div><div class="rows">${rows.map((row, i) =>
     (i === mid ? stripHtml() : '') + `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="table-bottom"></div></div>`;
 }
 
@@ -162,7 +176,7 @@ function stackLayer(l) {
   const undo = s.history.length ? `<button class="undo" data-act="undo">${icon('undo')}<span>Put back ${esc(s.history[0].title)}</span></button>` : '';
   const main = s.items.length
     ? `<div class="scroll">${s.items.map((it, i) => stackRow(it, i, l.editing)).join('')}<p class="note">Swipe right to copy, left to remove. Tap for details, hold for more.</p></div>`
-    : `<div class="scroll"><div class="empty"><img src="assets/illo-stack.webp" alt="">${divider}<h2>The stack is empty</h2><p>Scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
+    : `<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>The stack is empty</h2><p>Scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
   return `<section class="sheet">${hero({ title: 'Stack', left: navBtn('Done', 'pop'), right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Edit', 'toggleEdit') : '' })}${main}
     <div class="actions">${topItem ? `${undo}<button class="cta" data-act="resolve" style="font-size:${topItem.title.length > 20 ? 18 : topItem.title.length > 12 ? 21 : 25}px"><span>Resolve ${esc(topItem.title)}</span></button>` : ''}
       <div class="addbar"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div>${foot}</section>`;
@@ -218,7 +232,7 @@ function scanLayer(l) {
   }
   const denied = l.state === 'denied', starting = l.state === 'starting';
   return `<section class="sheet">${hero({ title: 'Scan a card', small: true, left: navBtn('Close', 'pop') })}<div class="scroll">
-    <img class="lens" src="assets/illo-lens.webp" alt="">
+    <img class="lens" src="${art('illo-lens.webp')}" alt="">
     <div class="center"><h2>${starting ? 'Opening the camera…' : denied ? 'Camera access is off' : 'No camera available'}</h2></div>${divider}
     <p class="center">${denied ? 'Allow the camera for this page in your browser settings, or search by name.' : 'Scanning needs a phone or laptop camera. You can search by name instead.'}</p>
     ${status.replace('scan-status', 'card-box center')}
@@ -243,7 +257,7 @@ function starterLayer(l) {
   const e = l.entries[l.cycling ?? l.selected];
   return `<div class="dim"><div class="starter" data-stop>${gem(e.color)}
     <div class="who"><b id="starterName" class="${e.name.length > 10 ? 'long' : ''}">${esc(e.name)}</b><i id="starterSub">${l.cycling == null ? 'goes first' : ''}</i></div>
-    <button class="hot reroll" data-act="reroll" aria-label="Reroll"></button><button class="hot done" data-act="pop" aria-label="Done"></button></div></div>`;
+    <button class="hot reroll" data-act="reroll" aria-label="Reroll"><em>${icon('dice')} Reroll</em></button><button class="hot done" data-act="pop" aria-label="Done"><em>Done</em></button></div></div>`;
 }
 function modal(title, body, buttons, stack) {
   return `<div class="dim" data-act="pop"><div class="modal" data-stop role="dialog" aria-label="${esc(title)}">${frame}${gem('crimson', 'top')}<h2>${esc(title)}</h2>${divider}<p>${esc(body)}</p><div class="btns ${stack ? 'stack' : ''}">${buttons}</div></div></div>`;
@@ -252,17 +266,51 @@ function stripBottom() {
   const el = document.getElementById('strip'); if (!el) return 400;
   return stage.clientHeight - el.offsetTop - el.offsetParent.offsetTop + 8;
 }
-function gameMenuLayer() {
-  return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop" data-stop style="right:10px;width:270px;bottom:${stripBottom()}px" role="menu">${frame}
-    <button class="mitem danger" data-act="askEndGame"><span class="ic r">${icon('x')}</span>End game</button>
-    <button class="mitem" data-act="openAbout"><span class="ic b">${icon('info')}</span>About</button>
-    <button class="mitem" data-act="backToSetup"><span class="ic o">${icon('sliders')}</span>Back to setup</button>
+function menuLayer() {
+  const atTable = S.screen === 'table' && S.game;
+  const btn = app.querySelector('.base [data-act=openMenu]')?.getBoundingClientRect(), box = stage.getBoundingClientRect();
+  const y = btn ? Math.round((btn.bottom - box.top) * stage.offsetHeight / box.height) + 6 : 86;
+  const item = (act, c, ic_, label, cls = '') => `<button class="mitem ${cls}" role="menuitem" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span>${label}</button>`;
+  return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop" data-stop style="right:10px;width:270px;top:${y}px" role="menu">${frame}
+    ${atTable ? item('backToSetup', 'o', 'sliders', 'Back to setup') : S.game ? item('resumeFromMenu', 'o', 'door', 'Resume game') : ''}
+    ${item('openDice', 'g', 'dice', 'Dice &amp; coin')}
+    ${item('openGuide', 't', 'help', 'How to use')}
+    ${item('openSettings', 't', 'gear', 'Settings')}
+    ${item('openAbout', 'b', 'info', 'About')}
+    ${S.game ? item('askEndGame', 'r', 'x', 'End game', 'danger') : ''}
 </div></div>`;
+}
+function settingsLayer() {
+  const st = S.settings;
+  const sw = (key, label, note) => `<div class="switchrow"><span>${label}${note ? `<small>${note}</small>` : ''}</span><button class="toggle" role="switch" aria-checked="${st[key]}" data-act="toggleSetting" data-k="${key}" aria-label="${label}"></button></div>`;
+  return `<section class="sheet">${hero({ title: 'Settings', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+    <div class="group">${head('Skins')}<div class="skins" role="radiogroup" aria-label="Skin">${SKINS.map(k => `<button class="skin ${k.id === skin().id ? 'on' : ''}" role="radio" aria-checked="${k.id === skin().id}" data-act="setSkin" data-id="${k.id}">
+      <span class="thumb" style="background-image:url('assets/${k.dir ? k.dir + '/' : ''}${k.id === 'moonspire' ? 'table-top' : 'hero'}.jpg')"></span><span class="txt"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tick">${k.id === skin().id ? icon('check') : ''}</span></button>`).join('')}</div></div>
+    <div class="group">${head('At the table')}<div class="card-box settings-box">
+      ${sw('keepAwake', 'Keep screen awake', 'During a game')}
+      ${'vibrate' in navigator ? sw('vibrate', 'Vibration', 'On life changes and when the stack resolves') : ''}
+    </div></div></div>${foot}</section>`;
+}
+function guideLayer() {
+  const sect = (c, t, items) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box"><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div></div>`;
+  return `<section class="sheet">${hero({ title: 'Guide', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about guide">
+    ${sect('crimson', 'Life', ['Tap + or − to change life by 1.', 'Hold to keep counting, and slide off to cancel.'])}
+    ${sect('sky', 'Counters', ['Tap the small pill on a panel for poison and commander damage.', 'You can rename a player from the same page.'])}
+    ${sect('amber', 'Timer', ['Tap the timer to start or pause it.', 'Hold it to add or remove a minute, or to reset.'])}
+    ${sect('forest', 'The stack', ['The newest item goes on top, and you resolve from the top down.', 'Swipe a row right to copy it or left to remove it.', 'Hold a row for more choices, or tap it for details.'])}
+    ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.'])}
+    </div>${foot}</section>`;
+}
+function diceLayer(l) {
+  return `<div class="dim" data-act="pop"><div class="modal" data-stop role="dialog" aria-label="Dice and coin">${frame}${gem('amber', 'top')}<h2>Dice &amp; coin</h2>${divider}
+    <div class="rollout" aria-live="polite"><b class="${l.result?.length > 3 ? 'word' : ''}">${esc(l.result ?? '–')}</b><small>${esc(l.label ?? 'Pick one to roll')}</small></div>
+    <div class="btns three"><button class="btn teal" data-act="rollDie" data-n="6">d6</button><button class="btn teal" data-act="rollDie" data-n="20">d20</button><button class="btn teal" data-act="flipCoin">Coin</button></div>
+    <button class="btn plain" data-act="pop">Done</button></div></div>`;
 }
 function timerMenuLayer() {
   const d = G.clock(S.game.timer.duration);
-  return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop timerpop" data-stop style="bottom:${stripBottom()}px" role="menu">${frame}<img src="assets/illo-hourglass.png" alt="">
-    <div class="list"><button class="btn plain" data-act="timerAdjust" data-d="-60">${icon('minus')}Remove 1 minute</button><button class="btn plain" data-act="timerAdjust" data-d="60">${icon('plus')}Add 1 minute</button><button class="btn plain" data-act="timerReset">${icon('reset')}Reset to ${d}</button></div><img src="assets/illo-hourglass.png" alt=""></div></div>`;
+  return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop timerpop" data-stop style="bottom:${stripBottom()}px" role="menu">${frame}<img src="${art('illo-hourglass.png')}" alt="">
+    <div class="list"><button class="btn plain" data-act="timerAdjust" data-d="-60">${icon('minus')}Remove 1 minute</button><button class="btn plain" data-act="timerAdjust" data-d="60">${icon('plus')}Add 1 minute</button><button class="btn plain" data-act="timerReset">${icon('reset')}Reset to ${d}</button></div><img src="${art('illo-hourglass.png')}" alt=""></div></div>`;
 }
 function rowMenuLayer(l) {
   const item = S.game.stack.items.find(i => i.id === l.id); if (!item) return '';
@@ -272,7 +320,7 @@ function rowMenuLayer(l) {
 }
 const LAYERS = {
   counters: countersLayer, stack: stackLayer, detail: detailLayer, ability: abilityLayer, search: searchLayer, confirm: confirmLayer,
-  scan: scanLayer, about: aboutLayer, starter: starterLayer, gameMenu: gameMenuLayer, timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
+  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
   replace: () => modal('Replace the game in progress?', 'Its life totals, counters and stack will be lost.', `<button class="cta mid" data-act="startForced"><span>Start new game</span></button><button class="btn teal" data-act="pop">Cancel</button>`, true),
   endGame: () => modal('End this game?', 'Life totals, counters and the stack will be cleared.', `<button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">End game</button>`),
 };
@@ -281,7 +329,7 @@ const LAYERS = {
 function draw() {
   const scrolls = S.layers.map((_, i) => app.querySelector(`.layer[data-i="${i}"] .scroll`)?.scrollTop ?? 0);
   const baseScroll = app.querySelector('.base .scroll')?.scrollTop ?? 0;
-  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'gameMenu', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
+  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'dice', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
     S.layers.map((l, i) => `<div class="layer" data-i="${i}" ${i < S.layers.length - 1 ? 'inert' : ''}>${LAYERS[l.type](l)}</div>`).join('');
   S.layers.forEach((_, i) => { const el = app.querySelector(`.layer[data-i="${i}"] .scroll`); if (el) el.scrollTop = scrolls[i]; });
   const b = app.querySelector('.base .scroll'); if (b) b.scrollTop = baseScroll;
@@ -335,7 +383,7 @@ function roll(l) {
   const show = i => {
     const e = l.entries[i], name = document.getElementById('starterName'), gemEl = app.querySelector('.starter .gem');
     if (!name) return;
-    name.textContent = e.name; name.classList.toggle('long', e.name.length > 10); gemEl.src = `assets/gem-${e.color}.png`;
+    name.textContent = e.name; name.classList.toggle('long', e.name.length > 10); gemEl.src = art(`gem-${e.color}.png`);
     document.getElementById('starterSub').textContent = i === pick && !l.spinning ? 'goes first' : '';
   };
   if (reduce || n < 2) { show(pick); return; }
@@ -349,7 +397,8 @@ function roll(l) {
   run();
 }
 function startGame() { S.draft.startingSeat = S.draft.startingSeat ?? null; S.game = G.makeGame(S.draft); S.draft.startingSeat = null; S.screen = 'table'; S.layers = []; draw(); wake(); }
-let lock; const wake = async () => { try { lock = await navigator.wakeLock?.request('screen'); } catch { /* Optional: not every browser allows it. */ } };
+let lock; const wake = async () => { if (!S.settings.keepAwake) return; try { lock = await navigator.wakeLock?.request('screen'); } catch { /* Optional: not every browser allows it. */ } };
+const randomBelow = n => { const buf = new Uint32Array(1), limit = 2 ** 32 - 2 ** 32 % n; do crypto.getRandomValues(buf); while (buf[0] >= limit); return buf[0] % n; };
 
 const A = {
   pop,
@@ -370,8 +419,20 @@ const A = {
   reroll() { const l = top(); if (!l.spinning) roll(l); },
   start() { if (S.game) push({ type: 'replace' }); else startGame(); },
   startForced: startGame,
-  openAbout() { if (top()?.type === 'gameMenu') S.layers.pop(); push({ type: 'about' }); },
-  openGameMenu() { push({ type: 'gameMenu' }); },
+  openMenu() { push({ type: 'menu' }); },
+  openAbout() { S.layers.pop(); push({ type: 'about' }); },
+  openSettings() { S.layers.pop(); push({ type: 'settings' }); },
+  openGuide() { S.layers.pop(); push({ type: 'guide' }); },
+  openDice() { S.layers.pop(); push({ type: 'dice' }); },
+  rollDie(d) { const l = top(); l.result = String(randomBelow(+d.n) + 1); l.label = `d${d.n}`; buzz(15); draw(); },
+  flipCoin() { const l = top(); l.result = randomBelow(2) ? 'Heads' : 'Tails'; l.label = 'Coin'; buzz(15); draw(); },
+  setSkin(d) { S.settings.skin = d.id; applySkin(); preloadArt(); draw(); },
+  toggleSetting(d) {
+    S.settings[d.k] = !S.settings[d.k];
+    if (d.k === 'keepAwake') { if (S.settings.keepAwake) { if (S.screen === 'table') wake(); } else { lock?.release?.(); lock = null; } }
+    draw();
+  },
+  resumeFromMenu() { S.layers = []; A.resume(); },
   askEndGame() { S.layers.pop(); push({ type: 'endGame' }); },
   endGame() { S.game = null; S.screen = 'setup'; S.layers = []; draw(); },
   backToSetup() { S.layers = []; S.screen = 'setup'; draw(); },
@@ -655,7 +716,7 @@ function fit() {
 }
 addEventListener('resize', fit);
 // Fetch the art up front so screens don't paint in pieces.
-['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)]
-  .forEach(n => { new Image().src = 'assets/' + n; });
+const preloadArt = () => ['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)].forEach(n => { new Image().src = art(n); });
+preloadArt();
 fit(); draw();
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.screen === 'table') wake(); });
