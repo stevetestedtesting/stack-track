@@ -1,9 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.7';
-import * as L from './lookup.js?v=1.7';
-import * as R from './recognition.js?v=1.7';
+import * as G from './core.js?v=1.8';
+import * as L from './lookup.js?v=1.8';
+import * as R from './recognition.js?v=1.8';
+import { createChance } from './dice.js?v=1.8';
 
-const APP_VERSION = '1.7';
+const APP_VERSION = '1.8';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -21,7 +22,7 @@ const S = {
   colorSeat: null,
   layers: [],
   playerbase: load('stackside.playerbase', []),
-  settings: { skin: DEFAULT_SKIN, keepAwake: true, vibrate: true, ...load('stackside.settings', {}) },
+  settings: { skin: DEFAULT_SKIN, keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
 const art = n => `assets/${skin().dir ? skin().dir + '/' : ''}${n}`;
@@ -302,6 +303,7 @@ function settingsLayer() {
       <span class="thumb" style="background-image:url('assets/${k.dir ? k.dir + '/' : ''}${k.id === 'moonspire' ? 'table-top' : 'hero'}.jpg')"></span><span class="txt"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tick">${k.id === skin().id ? icon('check') : ''}</span></button>`).join('')}</div></div>
     <div class="group">${head('At the table')}<div class="card-box settings-box">
       ${sw('keepAwake', 'Keep screen awake', 'During a game')}
+      ${sw('reduceMotion', 'Reduce motion', 'Dice and coin land without tumbling')}
       ${'vibrate' in navigator ? sw('vibrate', 'Vibration', 'On life changes and when the stack resolves') : ''}
     </div></div><p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
 }
@@ -340,10 +342,18 @@ function endGameLayer(l) {
     ${chipsHtml(l.winner, 'pickWinner')}
     <div class="btns"><button class="btn teal" data-act="pop">Keep playing</button><button class="btn ruby" data-act="endGame">${l.winner ? 'End &amp; record' : 'End, no record'}</button></div></div></div>`;
 }
+const CHANCE = {
+  d6: { name: 'D6', go: 'Roll D6', again: 'Roll again', moving: 'Rolling', done: 'You rolled' },
+  d20: { name: 'D20', go: 'Roll D20', again: 'Roll again', moving: 'Rolling', done: 'You rolled' },
+  coin: { name: 'Coin', go: 'Toss coin', again: 'Toss again', moving: 'In the air', done: 'The coin lands' },
+};
 function diceLayer(l) {
-  return `<div class="dim" data-act="pop"><div class="modal" data-stop role="dialog" aria-label="Dice and coin">${frame}${gem('amber', 'top')}<h2>Dice &amp; coin</h2>${divider}
-    <div class="rollout" aria-live="polite"><b class="${l.result?.length > 3 ? 'word' : ''}">${esc(l.result ?? '–')}</b><small>${esc(l.label ?? 'Pick one to roll')}</small></div>
-    <div class="btns three"><button class="btn teal" data-act="rollDie" data-n="6">d6</button><button class="btn teal" data-act="rollDie" data-n="20">d20</button><button class="btn teal" data-act="flipCoin">Coin</button></div>
+  const c = CHANCE[l.kind], off = l.busy ? 'disabled' : '';
+  return `<div class="dim" data-act="pop"><div class="modal chance" data-stop role="dialog" aria-label="Dice and coin">${frame}${gem('amber', 'top')}<h2>Chance Chamber</h2>
+    <div class="seg" role="radiogroup" aria-label="Choose what to roll">${Object.keys(CHANCE).map(k => `<button class="${k === l.kind ? 'on' : ''}" role="radio" aria-checked="${k === l.kind}" data-act="chanceKind" data-k="${k}" ${off}>${CHANCE[k].name}</button>`).join('')}</div>
+    <div class="chance-stage"><canvas id="chanceCanvas" aria-hidden="true"></canvas><button class="chance-surface" data-act="chanceRoll" aria-label="${c.go}" ${off}></button></div>
+    <div class="chance-out" role="status" aria-live="polite" aria-atomic="true"><small>${esc(l.busy ? c.moving : l.result != null ? c.done : 'Let fate decide')}</small><b class="${l.result != null && !l.busy ? 'reveal' : ''}">${esc(l.busy ? '…' : l.result ?? '–')}</b></div>
+    <button class="cta mid" data-act="chanceRoll" ${off}><span>${l.result != null || l.busy ? c.again : c.go}</span></button>
     <button class="btn plain" data-act="pop">Done</button></div></div>`;
 }
 function timerMenuLayer() {
@@ -378,10 +388,24 @@ function draw() {
   const b = app.querySelector('.base .scroll'); if (b) b.scrollTop = baseScroll;
   tick(true);
   attachScan();
+  attachChance();
   const t = top();
   if (t?.autofocus) { app.querySelector('#' + t.autofocus)?.focus(); delete t.autofocus; }
   if (t?.renaming && t.focusRename) { const i = app.querySelector('#renameInput'); i?.focus(); i?.select(); t.focusRename = false; }
   save();
+}
+let chance = null;
+function attachChance() {
+  const l = top(), canvas = document.getElementById('chanceCanvas');
+  if (l?.type !== 'dice' || !canvas) { chance?.destroy(); chance = null; return; }
+  if (!chance) {
+    chance = createChance({
+      reduced: () => S.settings.reduceMotion,
+      onSettled: value => { l.result = String(value); l.busy = false; buzz(15); if (top() === l) draw(); },
+    });
+    chance.attach(canvas);
+    chance.choose(l.kind);
+  } else chance.attach(canvas);
 }
 function push(layer) { S.layers.push(layer); draw(); }
 function pop() { const l = S.layers.pop(); if (l?.type === 'scan') stopScan(); draw(); resumeScanIfTop(); }
@@ -466,9 +490,13 @@ const A = {
   openAbout() { S.layers.pop(); push({ type: 'about' }); },
   openSettings() { S.layers.pop(); push({ type: 'settings' }); },
   openGuide() { S.layers.pop(); push({ type: 'guide' }); },
-  openDice() { S.layers.pop(); push({ type: 'dice' }); },
-  rollDie(d) { const l = top(); l.result = String(randomBelow(+d.n) + 1); l.label = `d${d.n}`; buzz(15); draw(); },
-  flipCoin() { const l = top(); l.result = randomBelow(2) ? 'Heads' : 'Tails'; l.label = 'Coin'; buzz(15); draw(); },
+  openDice() { S.layers.pop(); push({ type: 'dice', kind: 'd6' }); },
+  chanceKind(d) { const l = top(); if (l.busy || !chance) return; l.kind = d.k; l.result = null; chance.choose(d.k); draw(); },
+  chanceRoll() {
+    const l = top(); if (l.busy || !chance) return;
+    const result = l.kind === 'coin' ? (randomBelow(2) ? 'Heads' : 'Tails') : randomBelow(l.kind === 'd6' ? 6 : 20) + 1;
+    l.busy = true; draw(); chance.roll(result);
+  },
   setSkin(d) { S.settings.skin = d.id; applySkin(); preloadArt(); draw(); },
   toggleSetting(d) {
     S.settings[d.k] = !S.settings[d.k];

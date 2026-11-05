@@ -103,7 +103,6 @@
 [data-skin="moonspire"] .ic.g, [data-skin="moonspire"] .ic.t, [data-skin="moonspire"] .ic.o { background: linear-gradient(180deg, #333e4c, #151c26); }
 [data-skin="moonspire"] .ic.b { background: linear-gradient(180deg, #2a5b92, #122c4e); }
 [data-skin="moonspire"] .ic.r { background: linear-gradient(180deg, #9a2a2e, #5a1216); }
-[data-skin="moonspire"] .rollout b { color: #f3f1ec; font-family: var(--text); text-shadow: 0 2px 4px rgba(0,0,0,.7); }
 [data-skin="moonspire"] .starter { aspect-ratio: 812 / 640; }
 [data-skin="moonspire"] .starter::before { background: var(--tex) 0 0 / 300px; border: solid 56px transparent; border-image: var(--frame) 170 fill / 56px stretch; border-radius: 22px; clip-path: none; }
 [data-skin="moonspire"] .starter .gem { top: 3%; width: 9%; }

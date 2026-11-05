@@ -314,12 +314,6 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .settings-box .switchrow + .switchrow { border-top: 1px solid rgba(200,152,60,.45); }
 .switchrow span small { display: block; font-size: 13px; font-weight: 400; color: var(--ink-soft); }
 .guide ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
-.rollout { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 92px; justify-content: center; }
-.rollout b { font: 700 58px/1 var(--display); color: var(--ruby); font-variant-numeric: tabular-nums; }
-.rollout b.word { font-size: 42px; }
-.rollout small { font-size: 14px; color: var(--ink-soft); }
-.modal .btns.three { grid-template-columns: 1fr 1fr 1fr; }
-.modal .btns.three .btn { padding: 0 6px; }
 .sect { display: contents; }
 .starter .hot em { display: none; font-style: normal; }
 .hero .ver { position: absolute; left: calc(50% + 100px); top: 62px; font-size: 12px; font-weight: 600; color: var(--gold-pale); text-shadow: 0 1px 2px rgba(0,0,0,.9); pointer-events: none; }
@@ -337,3 +331,13 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .modal .chips { position: relative; }
 .btn.wide { display: flex; }
 .hero.small h1.long.clear-left { padding-left: 0; }
+.modal.chance { padding-top: 22px; gap: 10px; }
+.chance-stage { height: 214px; margin: -2px 0 -8px; }
+.chance-stage canvas { display: block; width: 100%; height: 100%; }
+.chance-surface { position: absolute; inset: 0; border-radius: 18px; }
+.chance-surface:disabled { opacity: 1; }
+.chance-out { display: flex; flex-direction: column; align-items: center; min-height: 66px; text-align: center; }
+.chance-out small { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
+.chance-out b { font: 600 40px/1.2 var(--text); font-variant-numeric: tabular-nums; }
+.chance-out b.reveal { animation: chanceReveal .5s ease-out; }
+@keyframes chanceReveal { from { opacity: 0; transform: translateY(8px) scale(.9); } }
