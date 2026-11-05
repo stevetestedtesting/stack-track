@@ -1,8 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js';
-import * as L from './lookup.js';
-import * as R from './recognition.js';
+import * as G from './core.js?v=1.3';
+import * as L from './lookup.js?v=1.3';
+import * as R from './recognition.js?v=1.3';
 
+const APP_VERSION = '1.3';
+const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 // Every skin supplies the same art files. `dir` is where they live under assets/.
 const SKINS = [
@@ -67,7 +69,7 @@ const divider = `<div class="divider">${icon('star')}</div>`;
 const head = t => `<div class="head"><h2>${esc(t)}</h2>${divider}</div>`;
 const flourish = '<svg class="flourish" viewBox="0 0 150 22" aria-hidden="true"><path d="M0 11h62M88 11h62" stroke="currentColor" stroke-width="1.200"/><path fill="currentColor" d="M75 0l1.800 9.200L86 11l-9.200 1.800L75 22l-1.800-9.200L64 11l9.200-1.800z"/></svg>';
 const hero = ({ title = 'Stackside', small, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''}">
-  <h1 class="${title.length > 9 ? 'long' : ''}">${esc(title)}</h1>${flourish}
+  <h1 class="${title.length > 9 ? 'long' : ''}">${esc(title)}</h1>${flourish}${small ? '' : `<span class="ver">${VER}</span>`}
   ${left ? `<div class="nav l">${left}</div>` : ''}${right ? `<div class="nav r">${right}</div>` : ''}</header>`;
 const navBtn = (label, act, attrs = '') => `<button class="btn teal" data-act="${act}" ${attrs}>${esc(label)}</button>`;
 const foot = '<div class="foot"></div>';
@@ -251,7 +253,7 @@ function aboutLayer() {
     ${sect('crimson', 'What this app does', '<p>Stackside tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
     ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stackside is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
     ${sect('amber', 'Legal', '<p>Stackside is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
-    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall.</p>')}</div>${foot}</section>`;
+    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall.</p>')}<p class="note center">Stackside ${VER}</p></div>${foot}</section>`;
 }
 function starterLayer(l) {
   const e = l.entries[l.cycling ?? l.selected];
@@ -278,6 +280,7 @@ function menuLayer() {
     ${item('openSettings', 't', 'gear', 'Settings')}
     ${item('openAbout', 'b', 'info', 'About')}
     ${S.game ? item('askEndGame', 'r', 'x', 'End game', 'danger') : ''}
+    <div class="mver">Stackside ${VER}</div>
 </div></div>`;
 }
 function settingsLayer() {
@@ -289,7 +292,7 @@ function settingsLayer() {
     <div class="group">${head('At the table')}<div class="card-box settings-box">
       ${sw('keepAwake', 'Keep screen awake', 'During a game')}
       ${'vibrate' in navigator ? sw('vibrate', 'Vibration', 'On life changes and when the stack resolves') : ''}
-    </div></div></div>${foot}</section>`;
+    </div></div><p class="note center">Stackside ${VER}</p></div>${foot}</section>`;
 }
 function guideLayer() {
   const sect = (c, t, items) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box"><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div></div>`;
@@ -719,4 +722,17 @@ addEventListener('resize', fit);
 const preloadArt = () => ['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)].forEach(n => { new Image().src = art(n); });
 preloadArt();
 fit(); draw();
-document.addEventListener('visibilitychange', () => { if (!document.hidden && S.screen === 'table') wake(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (S.screen === 'table') wake(); checkForUpdate(); });
+// Browsers can hold old copies of this site, and GitHub Pages lets them. Games are saved, so reloading loses nothing.
+async function checkForUpdate() {
+  if (S.layers.length) return;
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const latest = res.ok ? (await res.json()).version : null;
+    if (!latest || latest === APP_VERSION || sessionStorage.getItem('stackside.updateTried') === latest) return;
+    sessionStorage.setItem('stackside.updateTried', latest);
+    save();
+    location.replace(`./?v=${latest}`);
+  } catch { /* Offline, or storage is blocked: carry on with this copy. */ }
+}
+checkForUpdate();

@@ -130,3 +130,5 @@
 [data-skin="moonspire"] .scan-status, [data-skin="moonspire"] .toast { background: rgba(15,21,29,.95); border: 1px solid var(--line); }
 [data-skin="moonspire"] .skin .thumb { background-position: 50% 0; }
 [data-skin="moonspire"] .cta span { line-height: 1.35; }
+[data-skin="moonspire"] .hero .ver { left: calc(50% + 122px); top: 128px; color: #cfd5dd; }
+[data-skin="moonspire"] .mver { border-top-color: rgba(176,186,200,.28); }
