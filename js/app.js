@@ -1,9 +1,9 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.3';
-import * as L from './lookup.js?v=1.3';
-import * as R from './recognition.js?v=1.3';
+import * as G from './core.js?v=1.4';
+import * as L from './lookup.js?v=1.4';
+import * as R from './recognition.js?v=1.4';
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 // Every skin supplies the same art files. `dir` is where they live under assets/.
@@ -93,7 +93,7 @@ function setupScreen() {
     return S.colorSeat === i ? row + `<div class="seat-colors">${G.COLORS.map(c => `<button class="${c === s.color ? 'on' : ''}" data-act="setColor" data-i="${i}" data-c="${c}" aria-label="${c}">${gem(c)}</button>`).join('')}</div>` : row;
   }).join('');
   const starter = d.startingSeat != null ? G.seatName(d, d.startingSeat) : 'Not chosen';
-  return `<section class="sheet">${hero({ right: `<button class="btn round info" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
+  return `<section class="sheet">${hero({ right: `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
     <div class="scroll">
       ${g ? `<div class="progress"><div><b>Game in progress</b><small>${esc(g.players.map(p => p.name).join(', '))}</small></div><button class="btn ember" data-act="resume">Resume</button></div>` : ''}
       <div class="sect"><div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
@@ -133,7 +133,7 @@ function stripHtml() {
 }
 function tableScreen() {
   const n = S.game.players.length, rows = G.tableRows(n), mid = Math.floor(rows.length / 2);
-  return `<div class="table n${n}"><div class="table-top"><button class="btn round info" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button></div><div class="rows">${rows.map((row, i) =>
+  return `<div class="table n${n}"><div class="table-top"><button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button></div><div class="rows">${rows.map((row, i) =>
     (i === mid ? stripHtml() : '') + `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="table-bottom"></div></div>`;
 }
 
