@@ -1,9 +1,9 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.6';
-import * as L from './lookup.js?v=1.6';
-import * as R from './recognition.js?v=1.6';
+import * as G from './core.js?v=1.7';
+import * as L from './lookup.js?v=1.7';
+import * as R from './recognition.js?v=1.7';
 
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -78,7 +78,7 @@ const divider = `<div class="divider">${icon('star')}</div>`;
 const head = t => `<div class="head"><h2>${esc(t)}</h2>${divider}</div>`;
 const flourish = '<svg class="flourish" viewBox="0 0 150 22" aria-hidden="true"><path d="M0 11h62M88 11h62" stroke="currentColor" stroke-width="1.200"/><path fill="currentColor" d="M75 0l1.800 9.200L86 11l-9.200 1.800L75 22l-1.800-9.200L64 11l9.200-1.800z"/></svg>';
 const hero = ({ title = APP_NAME, small, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''}">
-  <h1 class="${title.length > 9 ? 'long' : ''} ${right && !left ? 'clear-left' : ''}">${esc(title)}</h1>${flourish}${title === APP_NAME ? `<span class="ver">${VER}</span>` : ''}
+  <h1 class="${title.length > 9 ? 'long' : ''} ${right && !left ? 'clear-left' : ''}">${esc(title)}</h1>${flourish}${title === APP_NAME && !small ? `<span class="ver">${VER}</span>` : ''}
   ${left ? `<div class="nav l">${left}</div>` : ''}${right ? `<div class="nav r">${right}</div>` : ''}</header>`;
 const navBtn = (label, act, attrs = '') => `<button class="btn teal" data-act="${act}" ${attrs}>${esc(label)}</button>`;
 const foot = '<div class="foot"></div>';
