@@ -1,11 +1,11 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.4';
-import * as L from './lookup.js?v=2.4';
-import * as R from './recognition.js?v=2.4';
-import { DECKS, deckById } from './decks.js?v=2.4';
-import { createChance } from './dice.js?v=2.4';
+import * as G from './core.js?v=2.5';
+import * as L from './lookup.js?v=2.5';
+import * as R from './recognition.js?v=2.5';
+import { DECKS, deckById } from './decks.js?v=2.5';
+import { createChance } from './dice.js?v=2.5';
 
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -489,7 +489,9 @@ const CHANCE = {
 };
 function diceLayer(l) {
   const c = CHANCE[l.kind], off = l.busy ? 'disabled' : '', landed = l.result != null && !l.busy;
-  return `<section class="sheet chance-sheet" role="dialog" aria-label="Dice and coin">
+  // Life stays on screen during a game, the same way it does on the stack page.
+  const [before, after] = S.game ? lifeSides() : ['', ''];
+  return `<section class="sheet chance-sheet ${S.game ? 'stack-life with-life' : ''}" role="dialog" aria-label="Dice and coin">${before}<div class="chance-mid">
     <header class="chance-top"><div class="chance-brand">✧ ${APP_NAME}</div>${navBtn("Who's first?", 'pickStarter')}</header>
     <div class="chance-body">
       <p class="chance-eyebrow">The ritual of chance</p>
@@ -501,7 +503,7 @@ function diceLayer(l) {
       <div class="chance-out" role="status" aria-live="polite" aria-atomic="true"><small>${esc(l.busy ? c.moving : l.result != null ? c.done : 'Awaiting your hand')}</small><b class="${landed ? 'reveal' : ''}">${esc(l.busy ? '…' : l.result ?? '—')}</b></div>
       <button class="cta mid chance-go" data-act="chanceRoll" ${off}><span>${l.result != null || l.busy ? c.again : c.go}</span></button>
       <div class="chance-foot"><span>Equal chance · ${c.range}</span><label><input type="checkbox" data-act="toggleSetting" data-k="reduceMotion" ${S.settings.reduceMotion ? 'checked' : ''} ${off}>Reduce motion</label></div>
-    </div></section>`;
+    </div></div>${after}</section>`;
 }
 function timerMenuLayer() {
   const d = G.clock(S.game.timer.duration);
@@ -546,7 +548,11 @@ function draw() {
 let chance = null;
 function attachChance() {
   const l = top(), canvas = document.getElementById('chanceCanvas');
-  if (l?.type !== 'dice' || !canvas) { chance?.destroy(); chance = null; return; }
+  if (l?.type !== 'dice' || !canvas) {
+    // A player's counters can open mid-roll now. That roll is abandoned, so the buttons must not stay disabled.
+    if (chance) S.layers.forEach(x => { if (x.type === 'dice') x.busy = false; });
+    chance?.destroy(); chance = null; return;
+  }
   if (!chance) {
     chance = createChance({
       reduced: () => S.settings.reduceMotion,

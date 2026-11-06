@@ -164,3 +164,28 @@ html[data-land] .navrow { min-height: 52px; padding-block: 5px; }
 /* Loaded last so it beats each skin's art strip: the menu button that needed that space is gone */
 html[data-skin] .table-top, html[data-skin] .table.n5 .table-top, html[data-skin] .table.n6 .table-top { height: 12px; background: none; margin: 0; }
 html[data-land] .sheet .srcs { margin-inline: 0; padding-inline: 0; }
+
+/* The dice page during a game: life on the outside, as on the stack page */
+.chance-mid { display: contents; }
+.chance-sheet.with-life { overflow: hidden; }
+.with-life .chance-mid { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
+.with-life .chance-top { padding: 8px 14px 0; }
+.with-life .chance-body { padding: 4px 14px 8px; }
+.with-life .chance-eyebrow, .with-life .chance-line { display: none; }
+.with-life .chance-title, [data-skin] .with-life .chance-title { margin: 0 0 6px; font-size: 24px; }
+.with-life .chance-kinds button { min-height: 46px; font-size: 18px; }
+.with-life .chance-stage { flex: 1 1 150px; min-height: 130px; }
+.with-life .chance-out { min-height: 62px; padding-top: 2px; }
+.with-life .chance-out b { font-size: 34px; }
+.with-life .chance-foot { margin-top: 2px; min-height: 24px; }
+@media (max-height: 720px) { .with-life .chance-title, .with-life .chance-foot { display: none; } }
+html[data-land] .with-life .chance-body { flex: 1; grid-template-columns: minmax(0, 1fr) 124px; grid-template-rows: auto auto 1fr auto; grid-template-areas: "kinds kinds" "stage who" "stage out" "go go"; column-gap: 8px; padding: 6px 8px; }
+html[data-land] .with-life .chance-title, html[data-land] .with-life .chance-hint, html[data-land] .with-life .chance-foot { display: none; }
+html[data-land] .with-life .chance-kinds { gap: 6px; }
+html[data-land] .with-life .chance-kinds button { min-height: 34px; font-size: 15px; }
+html[data-land] .with-life .chance-kinds button span { display: none; }
+html[data-land] .with-life .chance-stage { min-height: 0; }
+html[data-land] .with-life .chance-top { position: absolute; top: 48px; right: 8px; width: 124px; padding: 0; justify-content: center; }
+html[data-land] .with-life .chance-out { margin-top: 40px; }
+html[data-land] .with-life .chance-go, html[data-land][data-skin] .with-life .chance-go { width: 100%; height: 46px; font-size: 14px; letter-spacing: 0; padding-inline: 4px; white-space: nowrap; }
+html[data-land] .with-life .chance-go span::after { display: none; }
