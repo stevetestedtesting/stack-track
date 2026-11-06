@@ -373,3 +373,54 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .chance-foot { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; min-height: 30px; font-size: 11px; color: var(--ink-soft); }
 .chance-foot label { display: flex; align-items: center; gap: 6px; min-height: 30px; cursor: pointer; }
 @keyframes chanceReveal { from { opacity: 0; transform: translateY(8px) scale(.93); } }
+
+/* Navigation: the same five places on every main page */
+:root { --tabh: 58px; --tabw: 62px; }
+.layer.root { bottom: calc(var(--tabh) + env(safe-area-inset-bottom)); }
+.tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tabh) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: flex; background: linear-gradient(180deg, var(--teal-lift), var(--teal-deep)); border-top: 2px solid var(--gold); isolation: isolate; }
+.tab { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--cream); opacity: .78; font-size: 12px; font-weight: 600; }
+.tab svg { font-size: 23px; }
+.tab.on { opacity: 1; color: var(--gold-pale); box-shadow: inset 0 3px 0 var(--gold-pale); background: rgba(255,255,255,.07); }
+.badge { position: absolute; top: 4px; left: calc(50% + 7px); min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; line-height: 1; color: #fff; background: var(--ruby-lift); border: 1.5px solid var(--gold-pale); font-variant-numeric: tabular-nums; }
+.navrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 62px; padding: 8px 12px; text-align: left; color: var(--ink); border: 1.5px solid var(--gold); border-radius: 15px; background: rgba(255,250,232,.3); }
+.navrow:active { filter: brightness(.92); }
+.navrow > svg { flex: none; font-size: 18px; opacity: .7; }
+.navrow .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--cream); border: 1.5px solid var(--gold-pale); font-size: 17px; }
+.navrow.danger b { color: var(--ruby); }
+.navrow.picked { border-color: var(--ember); border-width: 2.5px; }
+.navrow.picked > svg { opacity: 1; color: var(--ember); }
+.navrow .gem { width: 30px; height: 30px; }
+.navrow .pb-text b { white-space: normal; line-height: 1.2; }
+
+/* Table, now that navigation is in the bar */
+.rows { padding-bottom: 7px; }
+.tbtn.lab { flex-direction: column; gap: 1px; min-width: 62px; padding: 0 6px; }
+.tbtn.lab svg { font-size: 19px; }
+.tbtn.lab small { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.pill em { font-style: normal; font-weight: 600; font-size: 12px; }
+.pill { gap: 8px; padding: 0 10px; white-space: nowrap; }
+.table.n5 .pill em, .table.n6 .pill em { display: none; }
+.row-more { flex: none; align-self: center; width: 44px; height: 44px; margin: -4px -6px -4px 0; display: grid; place-items: center; font-size: 19px; color: var(--ink-soft); border-radius: 50%; }
+
+/* Stack page and deck picker */
+.addbar.four { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.addbar.four .btn { font-size: 14px; min-height: 56px; }
+.deck-open { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; color: inherit; }
+.deck-open .head > svg { flex: none; margin-left: auto; font-size: 18px; opacity: .7; }
+.deck-open .deck-meta, .deck-blurb { display: block; font-size: 15px; }
+.deck-open .deck-meta { font-size: 13px; }
+.deck-on { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; color: var(--ember); }
+.deck-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.deck-btns .btn { padding: 0 6px; font-size: 15px; }
+.deck-title { display: flex; align-items: center; gap: 10px; }
+.deck-title h2 { font: 700 22px/1.15 var(--text); min-width: 0; }
+.card-row .mana i { width: 18px; height: 18px; font-size: 10px; }
+.card-row .pb-text b { font-size: 16px; }
+.srcs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-inline: -18px; padding-inline: 18px; }
+.srcs::-webkit-scrollbar { display: none; }
+.srcchip { flex: none; max-width: 230px; min-height: 42px; padding: 0 14px; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; border: 1.5px solid var(--gold); font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); background: rgba(255,250,232,.3); }
+.srcchip.on { color: var(--cream); background: var(--sheen), linear-gradient(180deg, var(--teal-lift), var(--teal)); box-shadow: 0 0 0 1.5px var(--gold-pale); }
+.srcchip.add { color: var(--ember); }
+.card-row .pb-text b.wrap { white-space: normal; line-height: 1.2; }
+.costline { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-height: 18px; }
+.costline small { font-weight: 700; font-variant-numeric: tabular-nums; }

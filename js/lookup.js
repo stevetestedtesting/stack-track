@@ -34,6 +34,19 @@ export const cardFuzzy = async n => toRecord(await get(`/cards/named?fuzzy=${q(n
 export const cardPrinting = async (s, n) => toRecord(await get(`/cards/${q(s)}/${q(n)}`));
 export const suggestions = async t => (await get(`/cards/autocomplete?q=${q(t)}`)).data;
 
+/** Many cards in one request, by name. Two-faced cards are keyed by their front face as well as their full name. */
+export async function cardsByName(names) {
+  const out = {};
+  for (let i = 0; i < names.length; i += 75) {
+    let res;
+    try { res = await fetch(`${API}/cards/collection`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ identifiers: names.slice(i, i + 75).map(name => ({ name })) }) }); }
+    catch { throw new LookupError('offline', 'Can’t reach Scryfall.'); }
+    if (!res.ok) throw new LookupError('server', `Scryfall returned an error (${res.status}).`);
+    for (const c of (await res.json()).data) { const r = toRecord(c); out[r.name] = r; out[r.faces[0].name] = r; }
+  }
+  return out;
+}
+
 const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '');
 function edit(a, b) {
   let prev = Array.from({ length: b.length + 1 }, (_, i) => i);

@@ -74,10 +74,7 @@ html[data-land] .modal { max-width: 520px; max-height: 100%; overflow-y: auto; p
 html[data-land] .modal .gem.top { display: none; }
 html[data-land] .modal .divider { display: none; }
 html[data-land] .modal .btn { min-height: 40px; }
-html[data-land] .pop:not(.timerpop) { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; width: 460px !important; top: 8px !important; right: calc(82px + env(safe-area-inset-right)) !important; }
-html[data-land] .pop .mitem + .mitem { border-top: 0; }
-html[data-land] .pop .mver { grid-column: 1 / -1; }
-html[data-land] .timerpop { left: auto; right: calc(82px + env(safe-area-inset-right)); top: 50%; bottom: auto !important; transform: translateY(-50%); }
+html[data-land] .timerpop { left: auto; right: calc(150px + env(safe-area-inset-right)); top: 50%; bottom: auto !important; transform: translateY(-50%); }
 html[data-land] .starter { width: auto; max-width: none; height: 100%; max-height: 320px; }
 
 /* Dice and coin: the controls, the die and the result sit side by side */
@@ -128,7 +125,7 @@ html[data-land] .stack-mid .scroll { padding: 6px 8px 6px; }
 html[data-land] .stack-mid > .actions { flex-direction: row; flex-wrap: wrap; align-items: stretch; padding: 0 8px 6px; }
 html[data-land] .stack-mid .undo { flex: 1 0 100%; min-height: 26px; }
 html[data-land] .stack-mid .cta { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 12px; font-size: 16px !important; }
-html[data-land] .stack-mid .addbar { flex: none; width: 170px; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+html[data-land] .stack-mid .addbar { flex: none; width: 216px; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 html[data-land] .stack-mid .addbar:only-child { flex: 1; width: auto; }
 html[data-land] .stack-mid .addbar .btn { min-height: 50px; font-size: 11px; border-radius: 14px; }
 html[data-land] .stack-mid .empty { gap: 2px; }
@@ -147,3 +144,23 @@ html[data-land] .cards-list, html[data-land] .decks { display: grid; grid-templa
 html[data-land] .addbar.two .btn { flex-direction: row; gap: 6px; min-height: 44px; }
 html[data-land] .sheet > .actions .save-card { min-height: 40px; }
 html[data-land] .cardview > .cardimg { align-self: start; }
+
+/* Navigation sits along the right edge, where a thumb is when the phone is sideways */
+html[data-land] .layer.root { bottom: 0; right: calc(var(--tabw) + env(safe-area-inset-right)); }
+html[data-land] .tabbar { left: auto; top: 0; bottom: 0; right: 0; width: calc(var(--tabw) + env(safe-area-inset-right)); height: auto; padding: 0 env(safe-area-inset-right) 0 0; flex-direction: column; border-top: 0; border-left: 2px solid var(--gold); }
+html[data-land] .tab { font-size: 11px; gap: 1px; }
+html[data-land] .tab svg { font-size: 20px; }
+html[data-land] .tab.on { box-shadow: inset 3px 0 0 var(--gold-pale); }
+html[data-land] .badge { top: 3px; }
+html[data-land] .rail { width: 66px; padding: 6px 5px; }
+html[data-land] .tbtn.lab { height: 50px; min-width: 0; }
+html[data-land] .tbtn.lab small { font-size: 9.5px; }
+html[data-land] .rows { padding-bottom: 6px; }
+html[data-land] .table-top { display: none; }
+html[data-land] .sheet, html[data-land] .table { padding-right: 0; }
+html[data-land] .deck-btns .btn { min-height: 40px; }
+html[data-land] .navrow { min-height: 52px; padding-block: 5px; }
+
+/* Loaded last so it beats each skin's art strip: the menu button that needed that space is gone */
+html[data-skin] .table-top, html[data-skin] .table.n5 .table-top, html[data-skin] .table.n6 .table-top { height: 12px; background: none; margin: 0; }
+html[data-land] .sheet .srcs { margin-inline: 0; padding-inline: 0; }

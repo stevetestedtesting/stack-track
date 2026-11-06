@@ -1,11 +1,11 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.2';
-import * as L from './lookup.js?v=2.2';
-import * as R from './recognition.js?v=2.2';
-import { DECKS } from './decks.js?v=2.2';
-import { createChance } from './dice.js?v=2.2';
+import * as G from './core.js?v=2.3';
+import * as L from './lookup.js?v=2.3';
+import * as R from './recognition.js?v=2.3';
+import { DECKS, deckById } from './decks.js?v=2.3';
+import { createChance } from './dice.js?v=2.3';
 
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -25,6 +25,9 @@ const S = {
   layers: [],
   playerbase: load('stackside.playerbase', []),
   cards: load('stackside.cards', []),
+  tableDecks: load('stackside.tabledecks', []), // Decks in use: { id, by: player id or null }.
+  deckCache: load('stackside.deckcache', {}), // Card records by name, so deck pages open instantly and survive a lost connection.
+  cardsTab: 'decks',
   settings: { skin: DEFAULT_SKIN, scanCamera: 'user', keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
@@ -42,6 +45,7 @@ function save() {
     localStorage.setItem('stackside.settings', JSON.stringify(S.settings));
     localStorage.setItem('stackside.playerbase', JSON.stringify(S.playerbase));
     localStorage.setItem('stackside.cards', JSON.stringify(S.cards));
+    localStorage.setItem('stackside.tabledecks', JSON.stringify(S.tableDecks));
     if (S.game) localStorage.setItem('stackside.game', JSON.stringify(S.game)); else localStorage.removeItem('stackside.game');
   } catch { /* A private window can refuse storage. The game still works until the page closes. */ }
 }
@@ -74,6 +78,9 @@ const ic = {
   menu: '<path d="M4 6.500h16M4 12h16M4 17.500h16"/>', help: '<path d="M8.500 9a3.500 3.500 0 1 1 5.300 3c-1.200.7-1.800 1.400-1.800 2.700"/><circle class="f" cx="12" cy="18.500" r="1.300"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/>',
   check: '<path d="M5 12.500l4.500 4.500L19 7"/>', door: '<path d="M14 4H6v16h8M10 12h10M16.500 8.500L20 12l-3.500 3.500"/>',
+  heart: '<path class="f" d="M12 20.500C5.500 16 3 12.700 3 9.200 3 6.400 5.100 4.500 7.600 4.500c1.800 0 3.400 1 4.400 2.700 1-1.700 2.600-2.700 4.400-2.700C18.900 4.500 21 6.400 21 9.200c0 3.500-2.500 6.800-9 11.300z"/>',
+  cards: '<rect x="9" y="4" width="11" height="16" rx="2"/><path d="M9 7L5.200 6c-1-.3-2 .3-2.300 1.300L.9 15c-.3 1 .3 2 1.300 2.300L9 19" transform="translate(1.500 0)"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
   star: '<path fill="currentColor" stroke="none" d="M12 0l1.700 9.300L24 12l-10.300 2.700L12 24l-1.700-9.300L0 12l10.300-2.700z"/>',
 };
 const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ic[n]}</svg>`;
@@ -108,11 +115,11 @@ function setupScreen() {
     return S.colorSeat === i ? row + `<div class="seat-colors">${G.COLORS.map(c => `<button class="${c === s.color ? 'on' : ''}" data-act="setColor" data-i="${i}" data-c="${c}" aria-label="${c}">${gem(c)}</button>`).join('')}</div>` : row;
   }).join('');
   const starter = d.startingSeat != null ? G.seatName(d, d.startingSeat) : 'Not chosen';
-  return `<section class="sheet setup">${hero({ right: `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
+  return `<section class="sheet setup">${hero({})}
     <div class="scroll">
       ${g ? `<div class="progress"><div><b>Game in progress</b><small>${esc(g.players.map(p => p.name).join(', '))}</small></div><button class="btn ember" data-act="resume">Resume</button></div>` : ''}
       <div class="sect"><div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
-      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div><button class="btn teal wide" data-act="openPlayerbaseLoad">${icon('users')} Load from playerbase</button></div>
+      <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div><button class="btn teal wide" data-act="openPlayerbaseLoad">${icon('users')} Load saved players</button></div>
       <div class="sect-side"><div class="sect"><div class="group">${head('Shared timer')}
         <div class="presets">${[25, 50, 75, 100].map(m => `<button class="btn ${m === d.timerMinutes ? 'ember' : 'plain'}" data-act="setMinutes" data-m="${m}">${m}m</button>`).join('')}</div>
         <div class="row"><span class="label" id="minutesLabel">${d.timerMinutes} minutes</span><div class="stepper"><button data-act="stepMinutes" data-d="-1" aria-label="One minute less">${icon('minus')}</button><button data-act="stepMinutes" data-d="1" aria-label="One minute more">${icon('plus')}</button></div></div>
@@ -121,7 +128,7 @@ function setupScreen() {
         <div class="row"><span class="label">${esc(starter)}</span><button class="btn teal" data-act="pickDraftStarter">${icon('dice')} ${d.startingSeat != null ? 'Pick again' : 'Pick randomly'}</button></div>
       </div></div></div>
     </div>
-    <div class="actions"><button class="cta" data-act="start"><span>Start game at ${G.STARTING_LIFE} life</span></button></div>${foot}</section>`;
+    <div class="actions"><button class="cta" data-act="start"><span>Start game at ${G.STARTING_LIFE} life</span></button></div></section>`;
 }
 
 function panelHtml(seat) {
@@ -135,23 +142,43 @@ function panelHtml(seat) {
       <div class="seat-in" style="--pink:var(--ink-${p.color})">
         <div class="pname">${flag}<span>${esc(p.name)}</span>${pbFind(p.name)?.games ? `<small class="pb-win">${winPct(pbFind(p.name))}</small>` : ''}</div>
         <div class="life ${long}" data-life="${p.id}">${p.life}</div>
-        <button class="pill" data-act="openCounters" data-id="${p.id}" aria-label="${esc(p.name)}'s counters: ${p.poison} poison, ${total} commander damage"><span>${icon('drop')}${p.poison}</span><span>${icon('shield')}${total}</span></button>
+        <button class="pill" data-act="openCounters" data-id="${p.id}" aria-label="${esc(p.name)}'s counters: ${p.poison} poison, ${total} commander damage"><span>${icon('drop')}<em>Poison</em> ${p.poison}</span><span>${icon('shield')}<em>Cmdr</em> ${total}</span></button>
       </div>
     </div></div>`;
 }
 function stripHtml() {
-  const n = S.game.stack.items.length;
   return `<div class="strip" id="strip">
-    <button class="tbtn timer" id="timerBtn" data-timer aria-label="Shared timer. Tap to start or pause, hold for more."><span id="timerIcon" style="display:contents"></span><span id="timerLabel"></span></button>
-    <button class="tbtn" data-act="pickGameStarter" aria-label="Pick a starting player">${icon('dice')}</button>
-    <button class="tbtn ${n ? 'has' : ''}" data-act="openStack" aria-label="Stack, ${n} items">${icon('layers')}${n}</button></div>`;
+    <button class="tbtn timer" id="timerBtn" data-timer aria-label="Shared timer. Tap to start or pause."><span id="timerIcon" style="display:contents"></span><span id="timerLabel"></span></button>
+    <button class="tbtn lab" data-act="openTimerMenu" aria-label="Change the timer">${icon('sliders')}<small>Timer</small></button>
+    <button class="tbtn lab" data-act="pickStarter" aria-label="Pick who goes first">${icon('dice')}<small>Who's first</small></button></div>`;
 }
 function tableScreen() {
   const n = S.game.players.length, rows = G.tableRows(n, S.land), mid = Math.floor(rows.length / 2);
-  const menu = `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>`;
-  if (S.land) return `<div class="table n${n}"><div class="rows">${rows.map(row => `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="rail">${menu}${stripHtml()}</div></div>`;
-  return `<div class="table n${n}"><div class="table-top"><button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button></div><div class="rows">${rows.map((row, i) =>
-    (i === mid ? stripHtml() : '') + `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="table-bottom"></div></div>`;
+  if (S.land) return `<div class="table n${n}"><div class="rows">${rows.map(row => `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="rail">${stripHtml()}</div></div>`;
+  return `<div class="table n${n}"><div class="table-top"></div><div class="rows">${rows.map((row, i) =>
+    (i === mid ? stripHtml() : '') + `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div></div>`;
+}
+
+// ---------- Navigation: the same five places, always one tap away ----------
+const ROOTS = { stack: 'stack', cards: 'cards', dice: 'dice', more: 'more' };
+const isRoot = (l, i) => i === 0 && !!ROOTS[l.type];
+const activeTab = () => ROOTS[S.layers[0]?.type] ?? 'game';
+function tabBar() {
+  const on = activeTab(), n = S.game?.stack.items.length ?? 0;
+  const tab = (id, ic_, label, badge = '') => `<button class="tab ${on === id ? 'on' : ''}" data-act="goTab" data-t="${id}" ${on === id ? 'aria-current="page"' : ''}>${icon(ic_)}<span>${label}</span>${badge}</button>`;
+  const covered = S.layers.some((l, i) => !isRoot(l, i));
+  return `<nav class="tabbar" aria-label="Main" ${covered ? 'inert' : ''}>${tab('game', 'heart', 'Game')}${tab('stack', 'layers', 'Stack', n ? `<b class="badge" aria-label="${n} on the stack">${n}</b>` : '')}${tab('cards', 'cards', 'Cards')}${tab('dice', 'dice', 'Dice')}${tab('more', 'dots', 'More')}</nav>`;
+}
+function moreLayer() {
+  const row = (act, c, ic_, title, sub, cls = '') => `<button class="navrow ${cls}" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span><span class="pb-text"><b>${title}</b><small>${sub}</small></span>${icon('chevron')}</button>`;
+  return `<section class="sheet">${hero({ title: 'More', small: true })}<div class="scroll">
+    ${S.game ? `<div class="group">${head('This game')}${row('backToSetup', 'o', 'sliders', 'New game or players', 'Change players, colours and the timer')}${row('askEndGame', 'r', 'x', 'End game', 'Pick the winner and clear the table', 'danger')}</div>` : ''}
+    <div class="group">${head('App')}
+      ${row('openPlayerbase', 't', 'users', 'Players', 'Saved players and win records')}
+      ${row('openGuide', 't', 'help', 'How to use', 'A short guide to every feature')}
+      ${row('openSettings', 't', 'gear', 'Settings', 'Skins, vibration and keeping the screen on')}
+      ${row('openAbout', 'b', 'info', 'About', 'Card data, privacy and legal')}</div>
+    <p class="note center">${APP_NAME} ${VER}</p></div></section>`;
 }
 
 const counterRow = (title, color, value, flagged, flagText, act, id) => `<div class="card-box counter">
@@ -188,7 +215,7 @@ function stackRow(item, i, editing) {
       <div class="meta">${i === 0 ? '<b>Next to resolve</b>' : `#${i + 1}`} · ${G.KIND_LABEL[item.kind]}</div>
       ${item.detail ? `<div class="oracle">${esc(item.detail)}</div>` : ''}
       ${c ? `<div class="who">${gem(c.color)}${esc(c.name)}</div>` : ''}</div>
-    ${editing ? `<div class="edit-arrows"><button data-act="moveItem" data-id="${item.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up')}</button><button data-act="moveItem" data-id="${item.id}" data-d="1" ${i === S.game.stack.items.length - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down')}</button></div>` : ''}</div>`;
+    ${editing ? '' : `<button class="row-more" data-act="openRowMenu" data-id="${item.id}" aria-label="More for ${esc(item.title)}">${icon('dots')}</button>`}${editing ? `<div class="edit-arrows"><button data-act="moveItem" data-id="${item.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up')}</button><button data-act="moveItem" data-id="${item.id}" data-d="1" ${i === S.game.stack.items.length - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down')}</button></div>` : ''}</div>`;
   return `<div class="stack-row"><div class="under"></div>${body}</div>`;
 }
 // Life stays in reach on the stack page, because a player can die while it resolves. The name opens their counters.
@@ -212,15 +239,16 @@ function lifeSides() {
   return [a, b].map(side => `<div class="lifeside">${side.map(miniLifeHtml).join('')}</div>`);
 }
 function stackLayer(l) {
+  if (!S.game) return `<section class="sheet">${hero({ title: 'Stack', small: true })}<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>No game yet</h2><p>The stack belongs to a game. Start one, and everything you cast is tracked here.</p><button class="btn ruby" data-act="goTab" data-t="game">Set up a game</button></div></div></section>`;
   const s = S.game.stack, topItem = s.items[0];
   const undo = s.history.length ? `<button class="undo" data-act="undo">${icon('undo')}<span>Put back ${esc(s.history[0].title)}</span></button>` : '';
   const main = s.items.length
-    ? `<div class="scroll">${s.items.map((it, i) => stackRow(it, i, l.editing)).join('')}<p class="note">Swipe right to copy, left to remove. Tap for details, hold for more.</p></div>`
-    : `<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>The stack is empty</h2><p>Scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
+    ? `<div class="scroll">${s.items.map((it, i) => stackRow(it, i, l.editing)).join('')}<p class="note">Tap a card for details. Use ⋯ to copy or remove it.</p></div>`
+    : `<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>The stack is empty</h2><p>Pick from a deck, scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
   const [before, after] = lifeSides();
-  return `<section class="sheet stack-life">${before}<div class="stack-mid">${hero({ title: 'Stack', small: true, compact: true, left: navBtn('Done', 'pop'), right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Edit', 'toggleEdit') : '' })}${main}
+  return `<section class="sheet stack-life">${before}<div class="stack-mid">${hero({ title: 'Stack', small: true, compact: true, right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Reorder', 'toggleEdit') : '' })}${main}
     <div class="actions">${topItem ? `${undo}<button class="cta" data-act="resolve" style="font-size:${topItem.title.length > 20 ? 18 : topItem.title.length > 12 ? 21 : 25}px"><span>Resolve ${esc(topItem.title)}</span></button>` : ''}
-      <div class="addbar"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div></div>${after}</section>`;
+      <div class="addbar four"><button class="btn teal" data-act="openDeckPick">${icon('cards')}Deck</button><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div></div>${after}</section>`;
 }
 const factsHtml = (card, f, short) => `${f.normal ? `<div class="cardimg ${short ? 'short' : ''}"><img src="${esc(f.normal)}" alt="${esc(f.name)} card"></div>` : ''}
   <div class="facts"><div class="row"><h2>${esc(f.name)}</h2>${manaHtml(f.manaCost)}</div>${f.typeLine ? `<div>${esc(f.typeLine)}</div>` : ''}</div>
@@ -239,33 +267,85 @@ const savedRows = l => {
     <button class="card-open" data-act="openSavedCard" data-id="${esc(c.id)}">${f.small ? `<span class="thumb"><img src="${esc(f.small)}" alt="" loading="lazy"></span>` : `<span class="thumb blank">${icon('image')}</span>`}<span class="pb-text"><b>${esc(c.name)}</b><small>${esc(f.typeLine)}</small></span></button>
     <button class="pb-del" data-act="askRemoveCard" data-id="${esc(c.id)}" aria-label="Remove ${esc(c.name)}">${icon('trash')}</button></div>`; }).join('')}</div>`;
 };
-const deckHtml = (d, l) => `<article class="card-box deck">
-  <div class="head">${gem(d.color)}<h3>${esc(d.name)}</h3></div>
-  <div class="deck-meta">${esc(d.format)}${d.winRate ? ` · ${esc(d.winRate)}` : ''}</div>
-  <p>${esc(d.blurb)}</p>
-  ${d.cards.length ? `<div class="deck-cards">${d.cards.map(n => `<button class="btn teal" data-act="openDeckCard" data-name="${esc(n)}">${l.loading === n ? '<i class="spin"></i>' : ''}${esc(n)}</button>`).join('')}</div>` : ''}
-  <div class="deck-src">Source: ${d.sources.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}</a>`).join(', ')}</div></article>`;
+const tableDeck = id => S.tableDecks.find(t => t.id === id);
+const playerOf = id => (S.game && id ? G.player(S.game, id) : null);
+const deckStatus = d => { const t = tableDeck(d.id); if (!t) return ''; const p = playerOf(t.by); return `<div class="deck-on">${icon('check')} In use${p ? ` by ${esc(p.name)}` : ''}</div>`; };
+const deckCount = d => d.cards.reduce((n, [c]) => n + c, 0);
+const deckHtml = d => `<article class="card-box deck">
+  <button class="deck-open" data-act="openDeck" data-id="${d.id}"><span class="head">${gem(d.color)}<h3>${esc(d.name)}</h3>${icon('chevron')}</span>
+  <span class="deck-meta">${esc(d.format)}${d.winRate ? ` · ${esc(d.winRate)}` : ''}</span><span class="deck-blurb">${esc(d.blurb)}</span></button>
+  ${deckStatus(d)}
+  <div class="deck-btns"><button class="btn ${tableDeck(d.id) ? 'plain' : 'ruby'}" data-act="toggleDeck" data-id="${d.id}">${tableDeck(d.id) ? 'Stop using' : 'Use this deck'}</button><button class="btn teal" data-act="openDeck" data-id="${d.id}">See ${d.cards.length} cards</button></div></article>`;
 function cardsLayer(l) {
-  const saved = l.tab !== 'decks';
+  const saved = S.cardsTab === 'saved';
   const body = saved
     ? `<div class="addbar two"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button></div>
       ${S.cards.length ? `<div class="searchbar"><div class="box">${icon('search')}<input id="cardFilter" data-bind="cardFilter" value="${esc(l.filter ?? '')}" placeholder="Find a saved card" autocomplete="off" aria-label="Find a saved card"></div></div>` : ''}
       <div id="savedCards">${savedRows(l)}</div>`
-    : `${l.message ? `<p class="warn">${esc(l.message)}</p>` : ''}<div class="decks">${DECKS.map(d => deckHtml(d, l)).join('')}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
-  return `<section class="sheet">${hero({ title: 'Cards', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
-    <div class="seg" role="radiogroup" aria-label="Section"><button class="${saved ? 'on' : ''}" role="radio" aria-checked="${saved}" data-act="cardsTab" data-t="saved">My cards</button><button class="${saved ? '' : 'on'}" role="radio" aria-checked="${!saved}" data-act="cardsTab" data-t="decks">Popular decks</button></div>
-    ${body}</div>${foot}</section>`;
+    : `<p class="note center">Pick a deck and its cards are ready on the Stack page, with no scanning.</p><div class="decks">${DECKS.map(deckHtml).join('')}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
+  return `<section class="sheet">${hero({ title: 'Cards', small: true })}<div class="scroll">
+    <div class="seg" role="radiogroup" aria-label="Section"><button class="${saved ? '' : 'on'}" role="radio" aria-checked="${!saved}" data-act="cardsTab" data-t="decks">Popular decks</button><button class="${saved ? 'on' : ''}" role="radio" aria-checked="${saved}" data-act="cardsTab" data-t="saved">My cards</button></div>
+    ${body}</div></section>`;
+}
+/** Card facts for every card in a list. Missing ones show by name, so a lost connection never blocks play. */
+const cached = name => S.deckCache[name];
+async function loadDeckCards(names, l) {
+  const missing = names.filter(n => !cached(n)); if (!missing.length) return;
+  l.offline = false;
+  try { Object.assign(S.deckCache, await L.cardsByName(missing)); try { localStorage.setItem('stackside.deckcache', JSON.stringify(S.deckCache)); } catch { /* Only a cache. */ } }
+  catch { l.offline = true; }
+  if (S.layers.includes(l)) draw();
+}
+const listRow = (count, name, act) => { const c = cached(name) ?? S.cards.find(x => x.name === name), f = c?.faces[0]; return `<div class="pb-row card-row">
+  <button class="card-open" data-act="${act}" data-name="${esc(name)}">${f?.small ? `<span class="thumb"><img src="${esc(f.small)}" alt="" loading="lazy"></span>` : `<span class="thumb blank">${icon('image')}</span>`}<span class="pb-text"><b class="wrap">${esc(name)}</b><span class="costline">${manaHtml(f?.manaCost)}${count ? `<small>×${count}</small>` : ''}</span></span></button>
+  ${act === 'addDeckCard' ? `<button class="pb-del" data-act="viewDeckCard" data-name="${esc(name)}" aria-label="Read ${esc(name)}">${icon('info')}</button>` : ''}</div>`; };
+const offlineNote = l => (l.offline ? '<p class="warn">No connection, so pictures and rules text are missing. You can still add cards by name.</p>' : '');
+function deckLayer(l) {
+  const d = deckById(l.id), t = tableDeck(d.id);
+  const lands = d.lands.map(([c, n]) => `${c} ${n}`).join(', ');
+  return `<section class="sheet">${hero({ small: true, right: navBtn('Back', 'pop') })}<div class="scroll">
+    <div class="deck-title">${gem(d.color)}<h2>${esc(d.name)}</h2></div>
+    <p class="deck-blurb">${esc(d.blurb)}</p>
+    <button class="btn ${t ? 'plain' : 'ruby'} wide" data-act="toggleDeck" data-id="${d.id}">${t ? `${icon('check')} In use. Tap to stop` : 'Use this deck'}</button>
+    ${t && S.game ? `<div class="group">${head('Who plays it?')}${chipsHtml(t.by, 'deckPlayer')}</div>` : ''}
+    ${offlineNote(l)}
+    <div class="cards-list">${d.cards.map(([c, n]) => listRow(c, n, 'viewDeckCard')).join('')}</div>
+    <p class="note">Lands don't use the stack, so they aren't listed above: ${esc(lands)}.</p>
+    ${d.note ? `<p class="note">${esc(d.note)}</p>` : ''}
+    <div class="deck-src">List from <a href="${esc(d.list.url)}" target="_blank" rel="noopener">${esc(d.list.label)}</a>, ${esc(d.list.date)}. Deck info: ${d.sources.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label)}</a>`).join(', ')}.</div>
+  </div></section>`;
+}
+/** What Add from deck offers: decks in use, then saved cards. */
+const pickSources = () => [...S.tableDecks.map(t => ({ key: t.id, label: deckById(t.id)?.short ?? t.id })), ...(S.cards.length ? [{ key: 'saved', label: 'My cards' }] : [])];
+function deckPickLayer(l) {
+  const sources = pickSources(), back = navBtn('Back', 'pop');
+  if (!sources.length || l.choosing) return `<section class="sheet">${hero({ title: 'Pick a deck', small: true, right: back })}<div class="scroll">
+    <p class="note center">Choose the decks at this table. Their cards stay ready here for the whole game.</p>
+    <div class="decks">${DECKS.map(d => `<button class="navrow ${tableDeck(d.id) ? 'picked' : ''}" data-act="pickDeckNow" data-id="${d.id}">${gem(d.color)}<span class="pb-text"><b>${esc(d.name)}</b><small>${deckCount(d)} spells and creatures</small></span>${icon(tableDeck(d.id) ? 'check' : 'chevron')}</button>`).join('')}</div></div></section>`;
+  const src = sources.find(x => x.key === l.source) ?? sources[0]; l.source = src.key;
+  const t = tableDeck(src.key), d = deckById(src.key);
+  const by = t ? t.by : l.controller;
+  const q = (l.filter ?? '').trim().toLowerCase();
+  const list = d ? d.cards : S.cards.map(c => [0, c.name]);
+  const rows = list.filter(([, n]) => n.toLowerCase().includes(q)).map(([c, n]) => listRow(c, n, 'addDeckCard')).join('') || '<p class="note center">No card here has that name.</p>';
+  return `<section class="sheet">${hero({ title: 'Add a card', small: true, right: back })}<div class="scroll">
+    <div class="srcs">${sources.map(x => `<button class="srcchip ${x.key === src.key ? 'on' : ''}" data-act="pickSource" data-k="${esc(x.key)}">${esc(x.label)}</button>`).join('')}<button class="srcchip add" data-act="chooseDecks">${icon('plus')} Decks</button></div>
+    <div class="group">${head(d ? 'Who plays it?' : 'Controller')}${chipsHtml(by, 'deckPlayer')}</div>
+    <div class="searchbar"><div class="box">${icon('search')}<input id="pickFilter" data-bind="pickFilter" value="${esc(l.filter ?? '')}" placeholder="Find in this list" autocomplete="off" aria-label="Find in this list"></div></div>
+    ${offlineNote(l)}
+    <p class="note">Tap a card to put it on the stack.</p>
+    <div class="cards-list" id="pickRows">${rows}</div></div></section>`;
 }
 function cardViewLayer(l) {
   const c = l.card, f = c.faces[l.faceIndex];
-  return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll cardview">
+  return `<section class="sheet">${hero({ small: true, right: navBtn('Back', 'pop') })}<div class="scroll cardview">
     ${c.faces.length > 1 ? `<div class="seg">${c.faces.map((x, i) => `<button class="${i === l.faceIndex ? 'on' : ''}" data-act="setFace" data-i="${i}" style="font-size:14px">${esc(x.name)}</button>`).join('')}</div>` : ''}
     ${saveBtn(c)}${factsHtml(c, f)}</div>
     ${S.game ? `<div class="actions"><div class="group">${head('Controller')}${chipsHtml(l.controller)}</div><button class="btn ruby" style="min-height:54px;font-size:19px" data-act="acceptCard">Add to stack</button></div>` : ''}${foot}</section>`;
 }
 function detailLayer(l) {
   const it = l.item, f = it.card?.faces[it.faceIndex];
-  return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll cardview">
+  return `<section class="sheet">${hero({ small: true, right: navBtn('Back', 'pop') })}<div class="scroll cardview">
     ${it.card ? saveBtn(it.card) : ''}${f ? factsHtml(it.card, f) : `<div class="facts"><h2 style="font:700 24px/1.15 var(--text)">${esc(it.title)}</h2><div>${G.KIND_LABEL[it.kind]}</div></div>${it.detail ? `<div class="card-box">${esc(it.detail)}</div>` : ''}`}
     ${it.copiedFrom ? `<p class="note">Copy of ${esc(it.copiedFrom)}</p>` : ''}</div>${foot}</section>`;
 }
@@ -327,11 +407,11 @@ function scanStatusHtml(l) {
 }
 function aboutLayer() {
   const sect = (c, t, body) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box">${body}</div></div>`;
-  return `<section class="sheet">${hero({ title: 'About', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about twocol">
+  return `<section class="sheet">${hero({ title: 'About', small: true, right: navBtn('Back', 'pop') })}<div class="scroll about twocol">
     ${sect('crimson', 'What this app does', '<p>Stack Track tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
     ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stack Track is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
     ${sect('amber', 'Legal', '<p>Stack Track is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
-    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall. Your playerbase, win records and saved cards stay in this browser.</p>')}<p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
+    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall. Your players, win records, saved cards and chosen decks stay in this browser.</p>')}<p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
 }
 function starterLayer(l) {
   const e = l.entries[l.cycling ?? l.selected];
@@ -346,27 +426,10 @@ function stripBottom() {
   const el = document.getElementById('strip'); if (!el) return 400;
   return stage.clientHeight - el.offsetTop - el.offsetParent.offsetTop + 8;
 }
-function menuLayer() {
-  const atTable = S.screen === 'table' && S.game;
-  const btn = app.querySelector('.base [data-act=openMenu]')?.getBoundingClientRect(), box = stage.getBoundingClientRect();
-  const y = btn ? Math.round((btn.bottom - box.top) * stage.offsetHeight / box.height) + 6 : 86;
-  const item = (act, c, ic_, label, cls = '') => `<button class="mitem ${cls}" role="menuitem" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span>${label}</button>`;
-  return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop" data-stop style="right:10px;width:270px;top:${y}px" role="menu">${frame}
-    ${atTable ? item('backToSetup', 'o', 'sliders', 'Back to setup') : S.game ? item('resumeFromMenu', 'o', 'door', 'Resume game') : ''}
-    ${item('openCards', 't', 'layers', 'Cards &amp; decks')}
-    ${item('openPlayerbase', 't', 'users', 'Playerbase')}
-    ${item('openDice', 'g', 'dice', 'Dice &amp; coin')}
-    ${item('openGuide', 't', 'help', 'How to use')}
-    ${item('openSettings', 't', 'gear', 'Settings')}
-    ${item('openAbout', 'b', 'info', 'About')}
-    ${S.game ? item('askEndGame', 'r', 'x', 'End game', 'danger') : ''}
-    <div class="mver">${APP_NAME} ${VER}</div>
-</div></div>`;
-}
 function settingsLayer() {
   const st = S.settings;
   const sw = (key, label, note) => `<div class="switchrow"><span>${label}${note ? `<small>${note}</small>` : ''}</span><button class="toggle" role="switch" aria-checked="${st[key]}" data-act="toggleSetting" data-k="${key}" aria-label="${label}"></button></div>`;
-  return `<section class="sheet">${hero({ title: 'Settings', small: true, right: navBtn('Done', 'pop') })}<div class="scroll twocol">
+  return `<section class="sheet">${hero({ title: 'Settings', small: true, right: navBtn('Back', 'pop') })}<div class="scroll twocol">
     <div class="group">${head('Skins')}<div class="skins" role="radiogroup" aria-label="Skin">${SKINS.map(k => `<button class="skin ${k.id === skin().id ? 'on' : ''}" role="radio" aria-checked="${k.id === skin().id}" data-act="setSkin" data-id="${k.id}">
       <span class="thumb" style="background-image:url('assets/${k.dir ? k.dir + '/' : ''}${k.id === 'moonspire' ? 'table-top' : 'hero'}.jpg')"></span><span class="txt"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tick">${k.id === skin().id ? icon('check') : ''}</span></button>`).join('')}</div></div>
     <div class="group">${head('At the table')}<div class="card-box settings-box">
@@ -377,13 +440,15 @@ function settingsLayer() {
 }
 function guideLayer() {
   const sect = (c, t, items) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box"><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div></div>`;
-  return `<section class="sheet">${hero({ title: 'Guide', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about guide twocol">
+  return `<section class="sheet">${hero({ title: 'How to use', small: true, right: navBtn('Back', 'pop') })}<div class="scroll about guide twocol">
+    ${sect('crimson', 'Finding things', ['The bar along the edge of the screen is always there: Game, Stack, Cards, Dice and More.', 'On a page that opens on top of those, Back returns you.'])}
     ${sect('crimson', 'Life', ['Tap + or − to change life by 1.', 'Hold to keep counting, and slide off to cancel.'])}
-    ${sect('sky', 'Counters', ['Tap the small pill on a panel for poison and commander damage.', 'You can rename a player from the same page.'])}
-    ${sect('amber', 'Timer', ['Tap the timer to start or pause it.', 'Hold it to add or remove a minute, or to reset.'])}
-    ${sect('forest', 'The stack', ['The newest item goes on top, and you resolve from the top down.', 'Swipe a row right to copy it or left to remove it.', 'Hold a row for more choices, or tap it for details.'])}
-    ${sect('rose', 'Win tracking', ['Save players in Playerbase from the menu, then load them on the setup screen.', 'A player counts when their name matches a saved one.', 'When you end a game, pick the winner to record it for everyone saved.'])}
-    ${sect('sky', 'My cards', ['Open Cards &amp; decks from the menu to save cards you scan or search for.', 'During a game, tap Save to My cards on any card, or add a saved card to the stack.'])}
+    ${sect('sky', 'Poison and commander damage', ['Tap the small button on a player\'s panel for both counters.', 'You can rename a player from the same page.'])}
+    ${sect('amber', 'Timer', ['Tap the clock to start or pause it.', 'Tap Timer beside it to add or remove a minute, or to reset.'])}
+    ${sect('forest', 'The stack', ['Open Stack and add a card with Deck, Scan, Search or Ability. The newest goes on top.', 'Resolve from the top down. Life totals stay on the page while you do.', 'Tap ⋯ on a row to copy or remove it, or swipe it right or left. Reorder appears with two or more.'])}
+    ${sect('sky', 'Decks', ['In Cards, choose a popular deck and tap Use this deck.', 'On the Stack page, tap Deck, choose who plays it once, then tap any card to cast it.', 'Lands are left out because they don\'t use the stack.'])}
+    ${sect('sky', 'My cards', ['In Cards, open My cards to scan or search for cards to keep.', 'Saved cards also appear when you tap Deck on the Stack page.'])}
+    ${sect('rose', 'Win tracking', ['Save names in More, under Players, then load them when setting up a game.', 'When you end a game from More, pick the winner to record it for everyone saved.'])}
     ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.'])}
     </div>${foot}</section>`;
 }
@@ -396,8 +461,8 @@ function playerbaseLayer(l) {
     return loading
       ? `<button class="pb-row pick ${on ? 'on' : ''}" role="checkbox" aria-checked="${on}" data-act="pbToggle" data-id="${e.id}"><span class="pb-tick">${on ? icon('check') : ''}</span>${body}</button>`
       : `<div class="pb-row">${body}<button class="pb-del" data-act="pbAskDelete" data-id="${e.id}" aria-label="Remove ${esc(e.name)}">${icon('trash')}</button></div>`;
-  }).join('') : '<p class="note center">No players saved yet.</p>';
-  return `<section class="sheet">${hero({ title: 'Playerbase', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+  }).join('') : '<p class="note center">No players saved yet. Add one to start tracking wins.</p>';
+  return `<section class="sheet">${hero({ title: 'Players', small: true, right: navBtn('Back', 'pop') })}<div class="scroll">
     ${loading ? `<p class="note center">Choose 2 to ${G.MAX_PLAYERS} players for this game.</p>` : ''}
     <div class="searchbar"><div class="box"><input id="pbName" data-bind="pbName" value="${esc(l.draftName ?? '')}" placeholder="Add a player" maxlength="24" autocomplete="off" aria-label="New player's name"></div><button class="btn teal" id="pbAdd" data-act="pbAdd" ${pbAddable(l.draftName) ? '' : 'disabled'}>Add</button></div>
     <div class="group">${rows}</div>
@@ -419,7 +484,7 @@ const CHANCE = {
 function diceLayer(l) {
   const c = CHANCE[l.kind], off = l.busy ? 'disabled' : '', landed = l.result != null && !l.busy;
   return `<section class="sheet chance-sheet" role="dialog" aria-label="Dice and coin">
-    <header class="chance-top"><div class="chance-brand">✧ ${APP_NAME}</div>${navBtn('Done', 'pop')}</header>
+    <header class="chance-top"><div class="chance-brand">✧ ${APP_NAME}</div>${navBtn("Who's first?", 'pickStarter')}</header>
     <div class="chance-body">
       <p class="chance-eyebrow">The ritual of chance</p>
       <h2 class="chance-title">Fortune <em>takes shape.</em></h2>
@@ -449,7 +514,7 @@ function pbDeleteLayer(l) {
 }
 const LAYERS = {
   counters: countersLayer, stack: stackLayer, detail: detailLayer, ability: abilityLayer, search: searchLayer, confirm: confirmLayer,
-  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, cards: cardsLayer, cardView: cardViewLayer,
+  scan: scanLayer, about: aboutLayer, starter: starterLayer, more: moreLayer, deck: deckLayer, deckPick: deckPickLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, cards: cardsLayer, cardView: cardViewLayer,
   cardRemove: l => { const c = S.cards.find(x => x.id === l.id); return modal(`Remove ${c?.name ?? 'card'}?`, 'It will leave My cards. You can always save it again.', `<button class="btn teal" data-act="pop">Keep</button><button class="btn ruby" data-act="removeCard">Remove</button>`); },
   timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
   replace: () => modal('Replace the game in progress?', 'Its life totals, counters and stack will be lost.', `<button class="cta mid" data-act="startForced"><span>Start new game</span></button><button class="btn teal" data-act="pop">Cancel</button>`, true),
@@ -460,8 +525,8 @@ const LAYERS = {
 function draw() {
   const scrolls = S.layers.map((_, i) => app.querySelector(`.layer[data-i="${i}"] .scroll`)?.scrollTop ?? 0);
   const baseScroll = app.querySelector('.base .scroll')?.scrollTop ?? 0;
-  app.innerHTML = `<div class="layer base" ${S.layers.some(l => !['starter', 'menu', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
-    S.layers.map((l, i) => `<div class="layer" data-i="${i}" ${i < S.layers.length - 1 ? 'inert' : ''}>${LAYERS[l.type](l)}</div>`).join('');
+  app.innerHTML = `<div class="layer base root" ${S.layers.some(l => !['starter', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
+    S.layers.map((l, i) => (i === 0 && !isRoot(l, 0) ? tabBar() : '') + `<div class="layer ${isRoot(l, i) ? 'root' : ''}" data-i="${i}" ${i < S.layers.length - 1 ? 'inert' : ''}>${LAYERS[l.type](l)}</div>` + (isRoot(l, i) ? tabBar() : '')).join('') + (S.layers.length ? '' : tabBar());
   S.layers.forEach((_, i) => { const el = app.querySelector(`.layer[data-i="${i}"] .scroll`); if (el) el.scrollTop = scrolls[i]; });
   const b = app.querySelector('.base .scroll'); if (b) b.scrollTop = baseScroll;
   tick(true);
@@ -565,11 +630,23 @@ const A = {
   reroll() { const l = top(); if (!l.spinning) roll(l); },
   start() { if (S.game) push({ type: 'replace' }); else startGame(); },
   startForced: startGame,
-  openMenu() { push({ type: 'menu' }); },
-  openAbout() { S.layers.pop(); push({ type: 'about' }); },
-  openSettings() { S.layers.pop(); push({ type: 'settings' }); },
-  openGuide() { S.layers.pop(); push({ type: 'guide' }); },
-  openDice() { S.layers.pop(); push({ type: 'dice', kind: 'd6' }); },
+  goTab(d) {
+    if (S.layers.some(l => l.type === 'scan')) stopScan();
+    if (d.t === 'game') {
+      if (activeTab() === 'game' && S.game && S.screen === 'setup') S.screen = 'table'; // Tapping Game again returns to the table.
+      S.layers = []; draw(); return;
+    }
+    if (activeTab() === d.t) { S.layers = S.layers.slice(0, 1); draw(); return; }
+    S.layers = [d.t === 'dice' ? { type: 'dice', kind: 'd6' } : d.t === 'cards' ? { type: 'cards', filter: '' } : { type: d.t }];
+    draw();
+    if (d.t === 'stack' && S.game) R.warmUp();
+  },
+  openAbout() { push({ type: 'about' }); },
+  openSettings() { push({ type: 'settings' }); },
+  openGuide() { push({ type: 'guide' }); },
+  pickStarter() { if (S.game) A.pickGameStarter(); else A.pickDraftStarter(); },
+  openTimerMenu() { push({ type: 'timerMenu' }); },
+  openRowMenu(d) { push({ type: 'rowMenu', id: d.id }); },
   chanceKind(d) { const l = top(); if (l.busy || !chance) return; l.kind = d.k; l.result = null; chance.choose(d.k); draw(); },
   chanceRoll() {
     const l = top(); if (l.busy || !chance) return;
@@ -582,8 +659,7 @@ const A = {
     if (d.k === 'keepAwake') { if (S.settings.keepAwake) { if (S.screen === 'table') wake(); } else { lock?.release?.(); lock = null; } }
     draw();
   },
-  resumeFromMenu() { S.layers = []; A.resume(); },
-  askEndGame() { S.layers.pop(); push({ type: 'endGame' }); },
+  askEndGame() { push({ type: 'endGame' }); },
   pickWinner(d) { const l = top(); l.winner = l.winner === d.id ? null : d.id; draw(); },
   endGame() {
     const winner = top()?.winner;
@@ -596,14 +672,38 @@ const A = {
     }
     S.game = null; S.screen = 'setup'; S.layers = []; draw();
   },
-  openPlayerbase() { S.layers.pop(); push({ type: 'playerbase', autofocus: 'pbName' }); },
-  openCards() { S.layers.pop(); push({ type: 'cards', tab: 'saved', filter: '' }); },
-  cardsTab(d) { const l = top(); l.tab = d.t; l.message = null; draw(); },
+  openPlayerbase() { push({ type: 'playerbase', autofocus: 'pbName' }); },
+  cardsTab(d) { S.cardsTab = d.t; draw(); },
   openSavedCard(d) { const card = S.cards.find(c => c.id === d.id); if (card) push({ type: 'cardView', card, faceIndex: 0, controller: S.lastController }); },
-  async openDeckCard(d) {
-    const l = top(); l.loading = d.name; l.message = null; draw();
-    try { const card = await L.cardExact(d.name); l.loading = null; if (top() === l) push({ type: 'cardView', card, faceIndex: 0, controller: S.lastController }); }
-    catch (e) { l.loading = null; l.message = e.message; if (top() === l) draw(); }
+  openDeck(d) { const l = { type: 'deck', id: d.id }; push(l); loadDeckCards(deckById(d.id).cards.map(([, n]) => n), l); },
+  toggleDeck(d) {
+    if (tableDeck(d.id)) S.tableDecks = S.tableDecks.filter(t => t.id !== d.id); else S.tableDecks.push({ id: d.id, by: null });
+    buzz(10); draw();
+    if (tableDeck(d.id)) loadDeckCards(deckById(d.id).cards.map(([, n]) => n), top());
+  },
+  deckPlayer(d) {
+    const l = top(), key = l.type === 'deck' ? l.id : l.source, t = tableDeck(key);
+    if (t) t.by = t.by === d.id ? null : d.id; else l.controller = l.controller === d.id ? null : d.id;
+    draw();
+  },
+  openDeckPick() { const l = { type: 'deckPick', controller: S.lastController, filter: '' }; push(l); pickLoad(l); },
+  pickSource(d) { const l = top(); l.source = d.k; l.filter = ''; draw(); pickLoad(l); },
+  chooseDecks() { top().choosing = true; draw(); },
+  pickDeckNow(d) {
+    const l = top();
+    if (!tableDeck(d.id)) S.tableDecks.push({ id: d.id, by: null });
+    l.choosing = false; l.source = d.id; l.filter = ''; buzz(10); draw(); pickLoad(l);
+  },
+  addDeckCard(d) {
+    const l = top(), t = tableDeck(l.source), by = t ? t.by : l.controller, controller = playerOf(by) ? by : null;
+    const card = l.source === 'saved' ? S.cards.find(c => c.name === d.name) : cached(d.name);
+    G.push(S.game.stack, card ? G.spellItem(card, 0, controller) : G.stackItem('spell', d.name, '', controller));
+    S.lastController = controller; buzz(15); returnToStack();
+  },
+  viewDeckCard(d) {
+    const l = top(), t = tableDeck(l.source ?? l.id), card = l.source === 'saved' ? S.cards.find(c => c.name === d.name) : cached(d.name);
+    if (card) { push({ type: 'cardView', card, faceIndex: 0, controller: t?.by ?? l.controller ?? S.lastController }); return; }
+    L.cardExact(d.name).then(c => { S.deckCache[d.name] = c; if (top() === l) push({ type: 'cardView', card: c, faceIndex: 0, controller: t?.by ?? S.lastController }); }).catch(() => { l.offline = true; if (top() === l) draw(); });
   },
   toggleSaved() {
     const l = top(), card = l.card ?? l.item?.card; if (!card) return;
@@ -655,7 +755,6 @@ const A = {
   toggleCommander() { S.game.commanderChangesLife = !S.game.commanderChangesLife; draw(); },
   openRename() { const l = top(); l.renaming = true; l.focusRename = true; l.draftName = G.player(S.game, l.id).name; draw(); },
   closeRename() { top().renaming = false; draw(); },
-  openStack() { push({ type: 'stack' }); R.warmUp(); },
   toggleEdit() { top().editing = !top().editing; draw(); },
   moveItem(d) { G.moveItem(S.game.stack, d.id, +d.d); draw(); },
   resolve() { G.resolveTop(S.game.stack); buzz(15); draw(); },
@@ -680,7 +779,7 @@ const A = {
   setFace(d) { top().faceIndex = +d.i; draw(); },
   acceptCard() {
     const l = top(); G.push(S.game.stack, G.spellItem(l.card, l.faceIndex, l.controller)); S.lastController = l.controller; buzz(15);
-    if (!S.layers.some(x => x.type === 'stack')) { while (S.layers.length) S.layers.pop(); push({ type: 'stack' }); return; }
+    if (S.layers[0]?.type !== 'stack') { S.layers = [{ type: 'stack' }]; draw(); return; }
     returnToStack();
   },
   rejectCard() { pop(); if (top()?.type === 'scan') scanModel.resume(); },
@@ -696,6 +795,10 @@ const A = {
   copyFor(d) { const id = top().id; S.layers.pop(); G.copyItem(S.game.stack, id, d.id); draw(); },
   removeFromMenu() { const id = top().id; S.layers.pop(); G.removeItem(S.game.stack, id); draw(); },
 };
+function pickLoad(l) {
+  const d = deckById(l.source ?? pickSources()[0]?.key);
+  if (d) loadDeckCards(d.cards.map(([, n]) => n), l);
+}
 function returnToStack() {
   while (S.layers.length && top().type !== 'stack') { const l = S.layers.pop(); if (l.type === 'scan') stopScan(); }
   draw();
@@ -847,6 +950,7 @@ document.addEventListener('input', e => {
     l[b === 'abilitySource' ? 'source' : 'effect'] = e.target.value;
     document.getElementById('abilityAdd').disabled = !(l.source.trim() || l.effect.trim()); return;
   }
+  if (b === 'pickFilter') { l.filter = e.target.value; draw(); const i = document.getElementById('pickFilter'); i?.focus(); i?.setSelectionRange(l.filter.length, l.filter.length); return; }
   if (b === 'cardFilter') { l.filter = e.target.value; document.getElementById('savedCards').innerHTML = savedRows(l); return; }
   if (b === 'search') {
     l.query = e.target.value; clearTimeout(searchTimer);
