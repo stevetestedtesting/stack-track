@@ -94,12 +94,19 @@ export function moveItem(s, id, delta) {
 export function restoreLast(s) { const it = s.history.shift(); if (it) s.items.unshift(it); }
 
 // Seats: rows from the top of the screen down. Every player appears exactly once.
-export function tableRows(n) {
+// Sideways phones: players sit along the long edges, so one row faces the other.
+export function tableRows(n, landscape = false) {
   let next = 0; const take = o => ({ index: next++, orientation: o }), sides = () => [take('left'), take('right')];
+  if (landscape) {
+    const row = (count, o) => Array.from({ length: count }, () => take(o));
+    if (n === 2) return [[take('top'), take('bottom')]];
+    const across = Math.floor(n / 2);
+    return [row(across, 'top'), row(n - across, 'bottom')];
+  }
   if (n === 2) return [[take('top')], [take('bottom')]];
   if (n === 3) return [[take('top')], sides()];
   if (n === 4) return [sides(), sides()];
   if (n === 5) return [[take('top')], sides(), sides()];
   return [sides(), sides(), sides()];
 }
-export const seatOf = (g, id) => tableRows(g.players.length).flat().find(s => g.players[s.index].id === id);
+export const seatOf = (g, id, landscape = false) => tableRows(g.players.length, landscape).flat().find(s => g.players[s.index].id === id);

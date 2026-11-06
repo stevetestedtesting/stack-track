@@ -1,10 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=1.9';
-import * as L from './lookup.js?v=1.9';
-import * as R from './recognition.js?v=1.9';
-import { createChance } from './dice.js?v=1.9';
+import * as G from './core.js?v=2.0';
+import * as L from './lookup.js?v=2.0';
+import * as R from './recognition.js?v=2.0';
+import { createChance } from './dice.js?v=2.0';
 
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -15,6 +15,7 @@ const SKINS = [
 ];
 const DEFAULT_SKIN = 'moonspire';
 const S = {
+  land: false,
   draft: { ...G.makeDraft(), ...load('stackside.draft', {}), startingSeat: null },
   game: load('stackside.game', null),
   screen: load('stackside.game', null) ? 'table' : 'setup',
@@ -104,18 +105,18 @@ function setupScreen() {
     return S.colorSeat === i ? row + `<div class="seat-colors">${G.COLORS.map(c => `<button class="${c === s.color ? 'on' : ''}" data-act="setColor" data-i="${i}" data-c="${c}" aria-label="${c}">${gem(c)}</button>`).join('')}</div>` : row;
   }).join('');
   const starter = d.startingSeat != null ? G.seatName(d, d.startingSeat) : 'Not chosen';
-  return `<section class="sheet">${hero({ right: `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
+  return `<section class="sheet setup">${hero({ right: `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>` })}
     <div class="scroll">
       ${g ? `<div class="progress"><div><b>Game in progress</b><small>${esc(g.players.map(p => p.name).join(', '))}</small></div><button class="btn ember" data-act="resume">Resume</button></div>` : ''}
       <div class="sect"><div class="group">${head('Players')}<div class="seg" role="radiogroup" aria-label="Number of players">${[2, 3, 4, 5, 6].map(n => `<button class="${n === d.playerCount ? 'on' : ''}" data-act="setCount" data-n="${n}" role="radio" aria-checked="${n === d.playerCount}">${n}</button>`).join('')}</div></div>
       <div class="seats ${d.playerCount > 4 ? 'dense' : ''}">${seats}</div><button class="btn teal wide" data-act="openPlayerbaseLoad">${icon('users')} Load from playerbase</button></div>
-      <div class="sect"><div class="group">${head('Shared timer')}
+      <div class="sect-side"><div class="sect"><div class="group">${head('Shared timer')}
         <div class="presets">${[25, 50, 75, 100].map(m => `<button class="btn ${m === d.timerMinutes ? 'ember' : 'plain'}" data-act="setMinutes" data-m="${m}">${m}m</button>`).join('')}</div>
         <div class="row"><span class="label" id="minutesLabel">${d.timerMinutes} minutes</span><div class="stepper"><button data-act="stepMinutes" data-d="-1" aria-label="One minute less">${icon('minus')}</button><button data-act="stepMinutes" data-d="1" aria-label="One minute more">${icon('plus')}</button></div></div>
       </div></div>
       <div class="sect"><div class="group">${head('Starting player')}
         <div class="row"><span class="label">${esc(starter)}</span><button class="btn teal" data-act="pickDraftStarter">${icon('dice')} ${d.startingSeat != null ? 'Pick again' : 'Pick randomly'}</button></div>
-      </div></div>
+      </div></div></div>
     </div>
     <div class="actions"><button class="cta" data-act="start"><span>Start game at ${G.STARTING_LIFE} life</span></button></div>${foot}</section>`;
 }
@@ -143,7 +144,9 @@ function stripHtml() {
     <button class="tbtn ${n ? 'has' : ''}" data-act="openStack" aria-label="Stack, ${n} items">${icon('layers')}${n}</button></div>`;
 }
 function tableScreen() {
-  const n = S.game.players.length, rows = G.tableRows(n), mid = Math.floor(rows.length / 2);
+  const n = S.game.players.length, rows = G.tableRows(n, S.land), mid = Math.floor(rows.length / 2);
+  const menu = `<button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button>`;
+  if (S.land) return `<div class="table n${n}"><div class="rows">${rows.map(row => `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="rail">${menu}${stripHtml()}</div></div>`;
   return `<div class="table n${n}"><div class="table-top"><button class="btn round navicon" data-act="openMenu" aria-label="Menu" aria-haspopup="menu">${icon('menu')}</button></div><div class="rows">${rows.map((row, i) =>
     (i === mid ? stripHtml() : '') + `<div class="trow">${row.map(panelHtml).join('')}</div>`).join('')}</div><div class="table-bottom"></div></div>`;
 }
@@ -158,13 +161,14 @@ function countersLayer(l) {
   const toggle = `<div class="switchrow"><span>Commander damage also changes life</span><button class="toggle" role="switch" aria-checked="${g.commanderChangesLife}" data-act="toggleCommander" aria-label="Commander damage also changes life"></button></div>`;
   const rows = others.map(o => { const v = p.commander[o.id] || 0; return counterRow(o.name, o.color, v, v >= G.COMMANDER_THRESHOLD, `${G.COMMANDER_THRESHOLD}+ damage`, 'adjCommander', o.id); }).join('');
   const headBits = `<button class="rename" data-act="openRename" aria-label="Rename ${esc(p.name)}"><span>${esc(p.name)}</span>${icon('pencil')}</button><span class="lifelabel">${p.life} life</span>`;
-  const sideways = l.rot === 'left' || l.rot === 'right';
+  // Worked out on each draw, because turning the phone moves the seats.
+  const rot = G.seatOf(g, p.id, S.land)?.orientation ?? 'bottom', sideways = rot === 'left' || rot === 'right';
   const rename = l.renaming ? `<div class="dim" data-act="closeRename"><form class="modal" data-stop data-form="rename">${frame}${gem(p.color, 'top')}<h2>Rename player</h2><div class="divider">${icon('star')}</div>
       <input class="field" id="renameInput" value="${esc(l.draftName)}" maxlength="24" autocomplete="off" aria-label="Name">
       <div class="btns"><button type="button" class="btn teal" data-act="closeRename">Cancel</button><button class="btn ruby" type="submit">Save</button></div></form></div>` : '';
-  const turned = l.rot !== 'bottom' ? `turned ${l.rot}` : '';
+  const turned = rot !== 'bottom' ? `turned ${rot}` : '';
   const style = sideways ? '--turned-w:var(--sh);--turned-h:var(--sw)' : '--turned-w:var(--sw);--turned-h:var(--sh)';
-  if (sideways) {
+  if (sideways || S.land) {
     return `<section class="sheet ${turned}" style="${style}"><div class="bar">${headBits}<button class="btn ember" data-act="pop">Done</button></div>
       <div class="scroll" style="padding-top:12px"><div class="wide-layout"><div>${poison}${toggle}</div><div><h2 style="font:700 17px/1.2 var(--text)">Commander damage received</h2>${rows}</div></div></div>${rename}</section>`;
   }
@@ -200,7 +204,7 @@ const factsHtml = (card, f, short) => `${f.normal ? `<div class="cardimg ${short
   <div class="credits">${f.artist ? `<span>Illustrated by ${esc(f.artist)}</span>` : ''}<span>${esc(card.setName)} #${esc(card.collectorNumber)}</span>${card.sourceUrl ? `<a href="${esc(card.sourceUrl)}" target="_blank" rel="noopener">Data and image from Scryfall</a>` : ''}</div>`;
 function detailLayer(l) {
   const it = l.item, f = it.card?.faces[it.faceIndex];
-  return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+  return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll cardview">
     ${f ? factsHtml(it.card, f) : `<div class="facts"><h2 style="font:700 24px/1.15 var(--text)">${esc(it.title)}</h2><div>${G.KIND_LABEL[it.kind]}</div></div>${it.detail ? `<div class="card-box">${esc(it.detail)}</div>` : ''}`}
     ${it.copiedFrom ? `<p class="note">Copy of ${esc(it.copiedFrom)}</p>` : ''}</div>${foot}</section>`;
 }
@@ -227,7 +231,7 @@ function searchLayer(l) {
 }
 function confirmLayer(l) {
   const c = l.card, f = c.faces[l.faceIndex], weak = l.readName && L.cardSimilarity(l.readName, c) < 0.7;
-  return `<section class="sheet">${hero({ small: true })}<div class="scroll">
+  return `<section class="sheet">${hero({ small: true })}<div class="scroll cardview">
     <div class="divider" style="color:var(--ink)"><h2 style="font:700 24px/1.1 var(--text)">Is this the card?</h2></div>
     ${weak ? `<div class="warn">${icon('warn')}<span>The scan read “${esc(l.readName)}”. Check this is your card.</span></div>` : ''}
     ${c.faces.length > 1 ? `<div class="seg">${c.faces.map((x, i) => `<button class="${i === l.faceIndex ? 'on' : ''}" data-act="setFace" data-i="${i}" style="font-size:14px">${esc(x.name)}</button>`).join('')}</div>` : ''}
@@ -260,7 +264,7 @@ function scanStatusHtml(l) {
 }
 function aboutLayer() {
   const sect = (c, t, body) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box">${body}</div></div>`;
-  return `<section class="sheet">${hero({ title: 'About', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about">
+  return `<section class="sheet">${hero({ title: 'About', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about twocol">
     ${sect('crimson', 'What this app does', '<p>Stack Track tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
     ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stack Track is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
     ${sect('amber', 'Legal', '<p>Stack Track is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
@@ -298,7 +302,7 @@ function menuLayer() {
 function settingsLayer() {
   const st = S.settings;
   const sw = (key, label, note) => `<div class="switchrow"><span>${label}${note ? `<small>${note}</small>` : ''}</span><button class="toggle" role="switch" aria-checked="${st[key]}" data-act="toggleSetting" data-k="${key}" aria-label="${label}"></button></div>`;
-  return `<section class="sheet">${hero({ title: 'Settings', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+  return `<section class="sheet">${hero({ title: 'Settings', small: true, right: navBtn('Done', 'pop') })}<div class="scroll twocol">
     <div class="group">${head('Skins')}<div class="skins" role="radiogroup" aria-label="Skin">${SKINS.map(k => `<button class="skin ${k.id === skin().id ? 'on' : ''}" role="radio" aria-checked="${k.id === skin().id}" data-act="setSkin" data-id="${k.id}">
       <span class="thumb" style="background-image:url('assets/${k.dir ? k.dir + '/' : ''}${k.id === 'moonspire' ? 'table-top' : 'hero'}.jpg')"></span><span class="txt"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tick">${k.id === skin().id ? icon('check') : ''}</span></button>`).join('')}</div></div>
     <div class="group">${head('At the table')}<div class="card-box settings-box">
@@ -309,7 +313,7 @@ function settingsLayer() {
 }
 function guideLayer() {
   const sect = (c, t, items) => `<div class="group"><div class="head">${gem(c)}<h3>${t}</h3>${divider}</div><div class="card-box"><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div></div>`;
-  return `<section class="sheet">${hero({ title: 'Guide', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about guide">
+  return `<section class="sheet">${hero({ title: 'Guide', small: true, right: navBtn('Done', 'pop') })}<div class="scroll about guide twocol">
     ${sect('crimson', 'Life', ['Tap + or − to change life by 1.', 'Hold to keep counting, and slide off to cancel.'])}
     ${sect('sky', 'Counters', ['Tap the small pill on a panel for poison and commander damage.', 'You can rename a player from the same page.'])}
     ${sect('amber', 'Timer', ['Tap the timer to start or pause it.', 'Hold it to add or remove a minute, or to reset.'])}
@@ -552,7 +556,7 @@ const A = {
   backToSetup() { S.layers = []; S.screen = 'setup'; draw(); },
   timerAdjust(d) { G.timerAdjust(S.game.timer, +d.d); S.game.timer.notified = false; tick(true); save(); },
   timerReset() { G.timerReset(S.game.timer); S.game.timer.notified = false; S.layers.pop(); draw(); },
-  openCounters(d) { push({ type: 'counters', id: d.id, rot: G.seatOf(S.game, d.id)?.orientation ?? 'bottom' }); },
+  openCounters(d) { push({ type: 'counters', id: d.id }); },
   adjPoison(d) { G.adjustPoison(S.game, d.id, +d.d); draw(); },
   adjCommander(d) { G.adjustCommander(S.game, top().id, d.id, +d.d); draw(); },
   toggleCommander() { S.game.commanderChangesLife = !S.game.commanderChangesLife; draw(); },
@@ -828,12 +832,24 @@ function startRowDrag(e, el) {
 
 // ---------- Stage fit ----------
 function fit() {
-  const vw = innerWidth, vh = innerHeight, phone = vw <= 500;
+  const vw = innerWidth, vh = innerHeight;
+  // Width has to pass 560 as well: a keyboard can leave an upright phone wider than it is tall.
+  const land = vw > vh && vh <= 500 && vw >= 560, phone = vw <= 500 || land;
   const w = phone ? vw : 402, h = phone ? vh : 874, s = phone ? 1 : Math.min(vw / 402, vh / 874, 1.3);
   Object.assign(stage.style, { width: w + 'px', height: h + 'px', position: 'absolute', left: '50%', top: '50%', transform: `translate(-50%,-50%) scale(${s})` });
   stage.style.setProperty('--sw', w + 'px'); stage.style.setProperty('--sh', h + 'px');
+  document.documentElement.toggleAttribute('data-land', land);
+  if (land === S.land) return;
+  S.land = land;
+  if (!app.firstChild) return;
+  // The table's markup differs between the two, so redraw, and keep the cursor where it was.
+  const focused = document.activeElement?.id;
+  draw();
+  if (focused) document.getElementById(focused)?.focus();
 }
 addEventListener('resize', fit);
+// Some phones report the old size during the rotation itself.
+addEventListener('orientationchange', () => setTimeout(fit, 250));
 // Fetch the art up front so screens don't paint in pieces.
 const preloadArt = () => ['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)].forEach(n => { new Image().src = art(n); });
 preloadArt();
