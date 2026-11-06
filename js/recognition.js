@@ -35,13 +35,18 @@ export function guideRect(w, h, frac = 0.8, maxFrac = 0.7) {
 }
 
 const ENGINE = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-let workerPromise;
+// The small, quick language data: phones spend far less time on each read. It caches under its own name.
+const LANG_DATA = { langPath: 'https://tessdata.projectnaptha.com/4.0.0_fast', cachePath: 'fast' };
+let workerPromise, workerReady = false;
+export const isReady = () => workerReady;
+/** Starts loading the reader ahead of time, so the first scan doesn't have to wait for it. */
+export const warmUp = () => worker().catch(() => {});
 function worker() {
   return workerPromise ??= new Promise((ok, no) => {
     const s = document.createElement('script');
     s.src = ENGINE; s.onload = ok; s.onerror = () => no(new Error('The text reader could not load. Check the connection.'));
     document.head.append(s);
-  }).then(() => window.Tesseract.createWorker('eng')).catch(e => { workerPromise = null; throw e; });
+  }).then(() => window.Tesseract.createWorker('eng', 1, LANG_DATA)).then(w => { workerReady = true; return w; }).catch(e => { workerPromise = null; throw e; });
 }
 // Tesseract reads a whole card badly because of the artwork, so it only sees the title bar and the collector line.
 function band(src, x0, y0, x1, y1, width = 1100) {
@@ -70,6 +75,26 @@ function rotated(c) {
   return r;
 }
 const uniqueNames = lines => [...new Set(lines.map(cleanName).filter(Boolean))];
+/** Cheap check that the title bar has anything in it, so an empty frame costs no reading time. */
+function hasDetail(canvas) {
+  const c = document.createElement('canvas'); c.width = 120; c.height = 16;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(canvas, .04 * canvas.width, .025 * canvas.height, .8 * canvas.width, .1 * canvas.height, 0, 0, 120, 16);
+  const d = x.getImageData(0, 0, 120, 16).data;
+  let sum = 0, sq = 0;
+  for (let i = 0; i < d.length; i += 4) { const l = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; sum += l; sq += l * l; }
+  const n = d.length / 4;
+  return Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2)) > 8;
+}
+/** The live camera's read: one pass per frame so it can retry often, switching between a wide band and the tight title bar. */
+let tightNext = false;
+export async function readTitle(canvas) {
+  if (workerReady && !hasDetail(canvas)) return null;
+  const tight = tightNext; tightNext = !tightNext;
+  const lines = tight ? await ocr(band(canvas, .04, .025, .84, .125, 800), '7') : await ocr(band(canvas, .02, .005, .9, .2, 800), '6');
+  const names = uniqueNames(lines);
+  return names.length ? names.slice(0, 3) : null;
+}
 /** Reads one card-shaped canvas: the title bar first, a wider band if the card sits off-centre, then a quarter turn for split cards. */
 export async function readCard(canvas) {
   let names = uniqueNames(await ocr(band(canvas, .04, .025, .84, .125), '7'));

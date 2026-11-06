@@ -1,10 +1,10 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.0';
-import * as L from './lookup.js?v=2.0';
-import * as R from './recognition.js?v=2.0';
-import { createChance } from './dice.js?v=2.0';
+import * as G from './core.js?v=2.1';
+import * as L from './lookup.js?v=2.1';
+import * as R from './recognition.js?v=2.1';
+import { createChance } from './dice.js?v=2.1';
 
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.1';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -23,7 +23,7 @@ const S = {
   colorSeat: null,
   layers: [],
   playerbase: load('stackside.playerbase', []),
-  settings: { skin: DEFAULT_SKIN, keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
+  settings: { skin: DEFAULT_SKIN, scanCamera: 'user', keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
 const art = n => `assets/${skin().dir ? skin().dir + '/' : ''}${n}`;
@@ -79,7 +79,7 @@ const gem = (c, cls = '') => `<img class="gem ${cls}" src="${art(`gem-${c}.png`)
 const divider = `<div class="divider">${icon('star')}</div>`;
 const head = t => `<div class="head"><h2>${esc(t)}</h2>${divider}</div>`;
 const flourish = '<svg class="flourish" viewBox="0 0 150 22" aria-hidden="true"><path d="M0 11h62M88 11h62" stroke="currentColor" stroke-width="1.200"/><path fill="currentColor" d="M75 0l1.800 9.200L86 11l-9.200 1.800L75 22l-1.800-9.200L64 11l9.200-1.800z"/></svg>';
-const hero = ({ title = APP_NAME, small, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''}">
+const hero = ({ title = APP_NAME, small, compact, left = '', right = '' }) => `<header class="hero ${small ? 'small' : ''} ${compact ? 'compact' : ''}">
   <h1 class="${title.length > 9 ? 'long' : ''} ${right && !left ? 'clear-left' : ''}">${esc(title)}</h1>${flourish}${title === APP_NAME && !small ? `<span class="ver">${VER}</span>` : ''}
   ${left ? `<div class="nav l">${left}</div>` : ''}${right ? `<div class="nav r">${right}</div>` : ''}</header>`;
 const navBtn = (label, act, attrs = '') => `<button class="btn teal" data-act="${act}" ${attrs}>${esc(label)}</button>`;
@@ -188,15 +188,36 @@ function stackRow(item, i, editing) {
     ${editing ? `<div class="edit-arrows"><button data-act="moveItem" data-id="${item.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${icon('up')}</button><button data-act="moveItem" data-id="${item.id}" data-d="1" ${i === S.game.stack.items.length - 1 ? 'disabled' : ''} aria-label="Move down">${icon('down')}</button></div>` : ''}</div>`;
   return `<div class="stack-row"><div class="under"></div>${body}</div>`;
 }
+// Life stays in reach on the stack page, because a player can die while it resolves. The name opens their counters.
+function miniLifeHtml(seat) {
+  const p = S.game.players[seat.index];
+  return `<div class="panel mini c-${p.color}">${frame}<div class="seat ${seat.orientation}">
+    <button class="press minus" data-press="-1" data-id="${p.id}" aria-label="Decrease ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('minus')}</span></button>
+    <button class="press plus" data-press="1" data-id="${p.id}" aria-label="Increase ${esc(p.name)}'s life" style="color:var(--ink-${p.color})"><span class="glyph">${icon('plus')}</span></button>
+    <div class="seat-in" style="--pink:var(--ink-${p.color})"><button class="mini-name" data-act="openCounters" data-id="${p.id}" aria-label="${esc(p.name)}'s counters">${esc(p.name)}</button><div class="life ${String(p.life).length > 2 ? 'long' : ''}" data-life="${p.id}">${p.life}</div></div>
+  </div></div>`;
+}
+/** Sideways, players keep their corners with the stack between them. Upright, one group sits above it and one below. */
+function lifeSides() {
+  const n = S.game.players.length, rows = G.tableRows(n, true);
+  const a = [], b = [];
+  if (!S.land) rows.flat().forEach((seat, i) => { const flipped = i < Math.floor(n / 2); (flipped ? a : b).push({ index: seat.index, orientation: flipped ? 'top' : 'bottom' }); });
+  else rows.forEach((row, r) => row.forEach((seat, x) => {
+    const middle = x === (row.length - 1) / 2, left = middle ? r === 0 : x < row.length / 2;
+    (left ? a : b).push(seat);
+  }));
+  return [a, b].map(side => `<div class="lifeside">${side.map(miniLifeHtml).join('')}</div>`);
+}
 function stackLayer(l) {
   const s = S.game.stack, topItem = s.items[0];
   const undo = s.history.length ? `<button class="undo" data-act="undo">${icon('undo')}<span>Put back ${esc(s.history[0].title)}</span></button>` : '';
   const main = s.items.length
     ? `<div class="scroll">${s.items.map((it, i) => stackRow(it, i, l.editing)).join('')}<p class="note">Swipe right to copy, left to remove. Tap for details, hold for more.</p></div>`
     : `<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>The stack is empty</h2><p>Scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
-  return `<section class="sheet">${hero({ title: 'Stack', left: navBtn('Done', 'pop'), right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Edit', 'toggleEdit') : '' })}${main}
+  const [before, after] = lifeSides();
+  return `<section class="sheet stack-life">${before}<div class="stack-mid">${hero({ title: 'Stack', small: true, compact: true, left: navBtn('Done', 'pop'), right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Edit', 'toggleEdit') : '' })}${main}
     <div class="actions">${topItem ? `${undo}<button class="cta" data-act="resolve" style="font-size:${topItem.title.length > 20 ? 18 : topItem.title.length > 12 ? 21 : 25}px"><span>Resolve ${esc(topItem.title)}</span></button>` : ''}
-      <div class="addbar"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div>${foot}</section>`;
+      <div class="addbar"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div></div>${after}</section>`;
 }
 const factsHtml = (card, f, short) => `${f.normal ? `<div class="cardimg ${short ? 'short' : ''}"><img src="${esc(f.normal)}" alt="${esc(f.name)} card"></div>` : ''}
   <div class="facts"><div class="row"><h2>${esc(f.name)}</h2>${manaHtml(f.manaCost)}</div>${f.typeLine ? `<div>${esc(f.typeLine)}</div>` : ''}</div>
@@ -244,8 +265,8 @@ function scanLayer(l) {
   const status = `<div class="scan-status" id="scanStatus" ${l.status ? '' : 'hidden'}>${scanStatusHtml(l)}</div>`;
   if (l.state === 'live') {
     return `<section class="sheet">${hero({ title: 'Scan a card', small: true, left: navBtn('Close', 'pop') })}
-      <div class="scan-live" id="scanLive"><video id="scanVideo" playsinline muted autoplay></video><div class="scan-guide" id="scanGuide"></div>${status}</div>
-      <div class="actions" style="padding-top:10px"><button class="btn teal" data-act="openSearch">${icon('search')} Search by name instead</button></div>${foot}</section>`;
+      <div class="scan-live" id="scanLive"><video id="scanVideo" class="${S.settings.scanCamera === 'user' ? 'mirror' : ''}" playsinline muted autoplay></video><div class="scan-guide" id="scanGuide"></div>${status}</div>
+      <div class="actions" style="padding-top:10px"><button class="btn teal" data-act="flipCamera">${icon('reset')} Use ${S.settings.scanCamera === 'user' ? 'back' : 'front'} camera</button><button class="btn teal" data-act="openSearch">${icon('search')} Search by name instead</button></div>${foot}</section>`;
   }
   const denied = l.state === 'denied', starting = l.state === 'starting';
   return `<section class="sheet">${hero({ title: 'Scan a card', small: true, left: navBtn('Close', 'pop') })}<div class="scroll">
@@ -443,14 +464,15 @@ const recent = {};
 function stepLife(id, d) {
   const p = G.player(S.game, id); if (!p) return;
   p.life += d; buzz(6);
-  const el = document.querySelector(`[data-life="${id}"]`);
-  if (el) {
-    const r = recent[id] ??= { n: 0 };
-    r.n += d; clearTimeout(r.t);
+  // The table sits underneath the stack page, so a player's total can be on screen twice.
+  const totals = () => document.querySelectorAll(`[data-life="${id}"]`);
+  const r = recent[id] ??= { n: 0 };
+  r.n += d; clearTimeout(r.t);
+  totals().forEach(el => {
     el.innerHTML = `${p.life}${r.n ? `<span class="delta">${r.n > 0 ? '+' : ''}${r.n}</span>` : ''}`;
     el.classList.toggle('long', String(p.life).length > 2);
-    r.t = setTimeout(() => { r.n = 0; const e = document.querySelector(`[data-life="${id}"]`); if (e) e.textContent = G.player(S.game, id)?.life ?? ''; }, 1800);
-  }
+  });
+  r.t = setTimeout(() => { r.n = 0; totals().forEach(e => { e.textContent = G.player(S.game, id)?.life ?? ''; }); }, 1800);
   save();
 }
 function roll(l) {
@@ -562,7 +584,7 @@ const A = {
   toggleCommander() { S.game.commanderChangesLife = !S.game.commanderChangesLife; draw(); },
   openRename() { const l = top(); l.renaming = true; l.focusRename = true; l.draftName = G.player(S.game, l.id).name; draw(); },
   closeRename() { top().renaming = false; draw(); },
-  openStack() { push({ type: 'stack' }); },
+  openStack() { push({ type: 'stack' }); R.warmUp(); },
   toggleEdit() { top().editing = !top().editing; draw(); },
   moveItem(d) { G.moveItem(S.game.stack, d.id, +d.d); draw(); },
   resolve() { G.resolveTop(S.game.stack); buzz(15); draw(); },
@@ -588,6 +610,7 @@ const A = {
   acceptCard() { const l = top(); G.push(S.game.stack, G.spellItem(l.card, l.faceIndex, l.controller)); S.lastController = l.controller; buzz(15); returnToStack(); },
   rejectCard() { pop(); if (top()?.type === 'scan') scanModel.resume(); },
   openScan() { const l = { type: 'scan', state: 'starting', status: null }; push(l); startScan(l); },
+  flipCamera() { const l = top(); S.settings.scanCamera = S.settings.scanCamera === 'user' ? 'environment' : 'user'; stopScan(); l.state = 'starting'; l.status = null; draw(); startScan(l); },
   scanSample() { runSample(top()); },
   async chooseSuggestion(d) {
     const l = top(); setStatus(l, { text: `Looking up “${d.name}”…`, busy: true });
@@ -613,9 +636,9 @@ function renderSearch(l) { const el = document.getElementById('searchResults'); 
 
 // ---------- Scan wiring: camera frames in, OCR, then lookup ----------
 const scanModel = {
-  stabilizer: new R.NameStabilizer(), pausedUntil: 0, busy: false, lastFailed: null, found: false, suggesting: false,
-  reset() { this.stabilizer.reset(); this.lastFailed = null; this.found = false; this.suggesting = false; this.busy = false; this.pausedUntil = 0; },
-  resume() { this.found = false; this.suggesting = false; this.lastFailed = null; this.stabilizer.reset(); this.pausedUntil = Date.now() + 1500; const l = top(); if (l?.type === 'scan') setStatus(l, null); },
+  stabilizer: new R.NameStabilizer(), tried: new Set(), pausedUntil: 0, busy: false, lastFailed: null, found: false, suggesting: false,
+  reset() { this.stabilizer.reset(); this.tried.clear(); this.lastFailed = null; this.found = false; this.suggesting = false; this.busy = false; this.pausedUntil = 0; },
+  resume() { this.found = false; this.suggesting = false; this.lastFailed = null; this.stabilizer.reset(); this.tried.clear(); this.pausedUntil = Date.now() + 1500; const l = top(); if (l?.type === 'scan') setStatus(l, null); },
 };
 let scanStream = null, scanTimer = null;
 function setStatus(l, st) {
@@ -627,10 +650,10 @@ async function startScan(l) {
   scanModel.reset();
   if (!navigator.mediaDevices?.getUserMedia) { l.state = 'none'; if (top() === l) draw(); return; }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } } });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: S.settings.scanCamera }, width: { ideal: 1920 } } });
     if (!S.layers.includes(l)) { stream.getTracks().forEach(t => t.stop()); return; }
     scanStream = stream; l.state = 'live'; draw();
-    scanTimer = setInterval(() => scanFrame(l), 700);
+    scanTimer = setInterval(() => scanFrame(l), 250);
   } catch (e) {
     l.state = e.name === 'NotAllowedError' || e.name === 'SecurityError' ? 'denied' : 'none';
     if (S.layers.includes(l)) draw();
@@ -653,16 +676,27 @@ async function scanFrame(l) {
     const pw = box.clientWidth, ph = box.clientHeight, g = R.guideRect(pw, ph, 0.8, 0.82);
     const s = Math.max(pw / v.videoWidth, ph / v.videoHeight), ox = (v.videoWidth * s - pw) / 2, oy = (v.videoHeight * s - ph) / 2;
     const c = R.toCanvas(v, (g.x + ox) / s, (g.y + oy) / s, g.w / s, g.h / s);
-    if (!l.status) setStatus(l, { text: 'Hold a card inside the frame.' });
-    const parsed = await R.readCard(c);
+    if (!R.isReady()) setStatus(l, { text: 'Preparing the text reader…', busy: true });
+    else if (!l.status) setStatus(l, { text: 'Hold a card inside the frame.' });
+    const names = await R.readTitle(c);
     if (top() !== l) return;
-    if (!parsed) { if (!l.status?.suggestions) setStatus(l, { text: 'Hold a card inside the frame.' }); return; }
-    const primary = parsed.names[0];
+    if (!names) { if (!l.status?.suggestions) setStatus(l, { text: 'Hold a card inside the frame.' }); return; }
+    const primary = names[0];
     setStatus(l, { text: `Reading “${primary}”…`, busy: true });
     const stable = m.stabilizer.add(primary);
-    if (!stable || stable === m.lastFailed) return;
+    if (stable === m.lastFailed) return;
+    // One clear read is enough when it closely matches a real card. Anything vaguer waits for a second read.
+    if (!stable) {
+      for (const name of names.filter(x => !m.tried.has(x))) {
+        m.tried.add(name);
+        const card = await L.quickMatch(name);
+        if (top() !== l) return;
+        if (card) { m.found = true; setStatus(l, null); openConfirm(card, name); m.stabilizer.reset(); return; }
+      }
+      return;
+    }
     setStatus(l, { text: `Looking up “${stable}”…`, busy: true });
-    await identifyAndShow(l, parsed, stable);
+    await identifyAndShow(l, { names, setCode: null, collectorNumber: null }, stable);
     m.stabilizer.reset();
   } catch (e) {
     m.pausedUntil = Date.now() + 3000; setStatus(l, { text: e.message });
@@ -670,6 +704,8 @@ async function scanFrame(l) {
 }
 async function identifyAndShow(l, parsed, name) {
   const r = await L.identify([name, ...parsed.names.slice(1)], parsed.setCode, parsed.collectorNumber);
+  // Scryfall's fuzzy search will match almost anything, so a read that barely resembles the card counts as no match.
+  if (r.type === 'match' && L.cardSimilarity(name, r.card) < 0.6) { scanModel.lastFailed = name; setStatus(l, { text: `Read “${name}” but found no card. Adjust the card or search by name.` }); return; }
   if (r.type === 'match') { scanModel.found = true; setStatus(l, null); if (top() === l) openConfirm(r.card, name); }
   else if (r.type === 'suggestions') { scanModel.suggesting = true; setStatus(l, { suggestions: r.names }); }
   else { scanModel.lastFailed = name; setStatus(l, { text: `Read “${name}” but found no card. Adjust the card or search by name.` }); }

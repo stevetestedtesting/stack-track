@@ -102,3 +102,42 @@ html[data-land] .setup .progress { padding-block: 4px; }
 html[data-land] .setup .progress small { display: inline; }
 html[data-land] .sheet > .actions, html[data-land] .sheet > .actions > * { min-width: 0; }
 html[data-land] .sheet > .actions [data-act=acceptCard], html[data-land] .sheet > .actions [data-act=rejectCard] { min-height: 46px !important; font-size: 15px !important; padding-inline: 6px; white-space: nowrap; }
+
+/* The stack page, in both orientations: compact header, stack in the middle, life on the outside */
+html[data-skin] .hero.small.compact { height: 54px; background-size: cover; background-position: 50% 30%; }
+html[data-skin] .hero.small.compact::after, html[data-skin] .hero.small.compact .flourish { display: none; }
+html[data-skin] .hero.small.compact h1 { top: 10px; padding-left: 0; font-size: 32px; line-height: 1.05; }
+html[data-skin] .hero.small.compact .nav { top: 5px; }
+.sheet.stack-life { display: flex; flex-direction: column; }
+.stack-mid { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.stack-mid > .actions { padding-bottom: 6px; }
+.stack-mid .empty img { width: auto; max-height: 130px; }
+.lifeside { flex: none; height: 78px; display: flex; gap: 5px; padding: 5px 7px; }
+.sheet .panel.mini { --bw: 22px; flex: 1 1 0; filter: none; }
+.mini .seat-in { justify-content: center; gap: 0; padding: 2px 34px; }
+.mini .press .glyph { width: 30px; font-size: 16px; }
+.mini .press.minus { padding-left: 6px; } .mini .press.plus { padding-right: 6px; }
+.mini .life, .mini .life.long { font-size: min(calc(var(--ih) * .52), calc(var(--iw) * .3)); }
+.mini-name { pointer-events: auto; position: relative; max-width: 100%; font-size: 12px; font-weight: 600; line-height: 1.15; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-skin="moonspire"] .mini-name { font-family: var(--text); text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+.mini .delta { top: -.1em; left: auto; right: -1.3em; transform: none; font-size: 12px; }
+html[data-land] .sheet.stack-life { flex-direction: row; }
+html[data-land] .lifeside { width: 136px; height: auto; flex-direction: column; padding: 6px 0 6px 6px; }
+html[data-land] .lifeside:last-child { padding: 6px 6px 6px 0; }
+html[data-land] .stack-mid .scroll { padding: 6px 8px 6px; }
+html[data-land] .stack-mid > .actions { flex-direction: row; flex-wrap: wrap; align-items: stretch; padding: 0 8px 6px; }
+html[data-land] .stack-mid .undo { flex: 1 0 100%; min-height: 26px; }
+html[data-land] .stack-mid .cta { flex: 1 1 0; width: auto; min-width: 0; padding-inline: 12px; font-size: 16px !important; }
+html[data-land] .stack-mid .addbar { flex: none; width: 170px; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+html[data-land] .stack-mid .addbar:only-child { flex: 1; width: auto; }
+html[data-land] .stack-mid .addbar .btn { min-height: 50px; font-size: 11px; border-radius: 14px; }
+html[data-land] .stack-mid .empty { gap: 2px; }
+html[data-land] .stack-mid .empty img { max-height: 54px; }
+html[data-land] .stack-mid .empty p { font-size: 13px; }
+html[data-land] .stack-mid .empty .divider { display: none; }
+html[data-land] .stack-mid .hero.compact h1 { font-size: 26px; top: 13px; }
+html[data-land] .lifeside { width: 152px; }
+html[data-land] .mini .seat-in { padding: 2px 24px; }
+html[data-land] .mini .press.minus { padding-left: 2px; } html[data-land] .mini .press.plus { padding-right: 2px; }
+html[data-land] .mini .life, html[data-land] .mini .life.long { font-size: min(calc(var(--ih) * .5), calc(var(--iw) * .36)); }
+html[data-land] .mini-name { font-size: 13px; }

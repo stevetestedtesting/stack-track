@@ -51,6 +51,11 @@ export function similarity(a, b) {
 export const cardSimilarity = (read, card) => Math.max(...[card.name, ...card.faces.map(f => f.name)].map(n => similarity(read, n)));
 
 const attempt = async fn => { try { return await fn(); } catch (e) { if (e.code === 'notFound') return null; throw e; } };
+/** A fuzzy match close enough to the words read to show straight away. Players confirm every card anyway. */
+export async function quickMatch(name) {
+  const card = await attempt(() => cardFuzzy(name));
+  return card && cardSimilarity(name, card) >= 0.75 ? card : null;
+}
 /** Exact printing (only if the name agrees), then fuzzy name, then suggestions. */
 export async function identify(names, setCode, collectorNumber) {
   const primary = names[0];
