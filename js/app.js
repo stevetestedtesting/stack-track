@@ -1,10 +1,11 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.1';
-import * as L from './lookup.js?v=2.1';
-import * as R from './recognition.js?v=2.1';
-import { createChance } from './dice.js?v=2.1';
+import * as G from './core.js?v=2.2';
+import * as L from './lookup.js?v=2.2';
+import * as R from './recognition.js?v=2.2';
+import { DECKS } from './decks.js?v=2.2';
+import { createChance } from './dice.js?v=2.2';
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -23,6 +24,7 @@ const S = {
   colorSeat: null,
   layers: [],
   playerbase: load('stackside.playerbase', []),
+  cards: load('stackside.cards', []),
   settings: { skin: DEFAULT_SKIN, scanCamera: 'user', keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
@@ -39,6 +41,7 @@ function save() {
     localStorage.setItem('stackside.draft', JSON.stringify({ seats: S.draft.seats, playerCount: S.draft.playerCount, timerMinutes: S.draft.timerMinutes }));
     localStorage.setItem('stackside.settings', JSON.stringify(S.settings));
     localStorage.setItem('stackside.playerbase', JSON.stringify(S.playerbase));
+    localStorage.setItem('stackside.cards', JSON.stringify(S.cards));
     if (S.game) localStorage.setItem('stackside.game', JSON.stringify(S.game)); else localStorage.removeItem('stackside.game');
   } catch { /* A private window can refuse storage. The game still works until the page closes. */ }
 }
@@ -223,10 +226,47 @@ const factsHtml = (card, f, short) => `${f.normal ? `<div class="cardimg ${short
   <div class="facts"><div class="row"><h2>${esc(f.name)}</h2>${manaHtml(f.manaCost)}</div>${f.typeLine ? `<div>${esc(f.typeLine)}</div>` : ''}</div>
   ${f.oracleText ? `<div class="card-box" style="white-space:pre-line">${esc(f.oracleText)}</div>` : ''}
   <div class="credits">${f.artist ? `<span>Illustrated by ${esc(f.artist)}</span>` : ''}<span>${esc(card.setName)} #${esc(card.collectorNumber)}</span>${card.sourceUrl ? `<a href="${esc(card.sourceUrl)}" target="_blank" rel="noopener">Data and image from Scryfall</a>` : ''}</div>`;
+const isSaved = card => S.cards.some(c => c.id === card.id);
+const saveBtn = card => `<button class="btn ${isSaved(card) ? 'plain' : 'teal'} save-card" data-act="toggleSaved" aria-pressed="${isSaved(card)}">${icon(isSaved(card) ? 'check' : 'plus')} ${isSaved(card) ? 'Saved to My cards' : 'Save to My cards'}</button>`;
+/** True when scan or search was opened from My cards, so the card goes to the collection and not the stack. */
+const savingCards = () => S.layers.some(l => l.type === 'cards');
+const savedRows = l => {
+  const t = (l.filter ?? '').trim().toLowerCase();
+  const found = S.cards.filter(c => c.name.toLowerCase().includes(t));
+  if (!S.cards.length) return '<p class="note center">No saved cards yet. Scan a card or search for one to start.</p>';
+  if (!found.length) return '<p class="note center">No saved card has that name.</p>';
+  return `<div class="cards-list">${found.map(c => { const f = c.faces[0]; return `<div class="pb-row card-row">
+    <button class="card-open" data-act="openSavedCard" data-id="${esc(c.id)}">${f.small ? `<span class="thumb"><img src="${esc(f.small)}" alt="" loading="lazy"></span>` : `<span class="thumb blank">${icon('image')}</span>`}<span class="pb-text"><b>${esc(c.name)}</b><small>${esc(f.typeLine)}</small></span></button>
+    <button class="pb-del" data-act="askRemoveCard" data-id="${esc(c.id)}" aria-label="Remove ${esc(c.name)}">${icon('trash')}</button></div>`; }).join('')}</div>`;
+};
+const deckHtml = (d, l) => `<article class="card-box deck">
+  <div class="head">${gem(d.color)}<h3>${esc(d.name)}</h3></div>
+  <div class="deck-meta">${esc(d.format)}${d.winRate ? ` · ${esc(d.winRate)}` : ''}</div>
+  <p>${esc(d.blurb)}</p>
+  ${d.cards.length ? `<div class="deck-cards">${d.cards.map(n => `<button class="btn teal" data-act="openDeckCard" data-name="${esc(n)}">${l.loading === n ? '<i class="spin"></i>' : ''}${esc(n)}</button>`).join('')}</div>` : ''}
+  <div class="deck-src">Source: ${d.sources.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}</a>`).join(', ')}</div></article>`;
+function cardsLayer(l) {
+  const saved = l.tab !== 'decks';
+  const body = saved
+    ? `<div class="addbar two"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button></div>
+      ${S.cards.length ? `<div class="searchbar"><div class="box">${icon('search')}<input id="cardFilter" data-bind="cardFilter" value="${esc(l.filter ?? '')}" placeholder="Find a saved card" autocomplete="off" aria-label="Find a saved card"></div></div>` : ''}
+      <div id="savedCards">${savedRows(l)}</div>`
+    : `${l.message ? `<p class="warn">${esc(l.message)}</p>` : ''}<div class="decks">${DECKS.map(d => deckHtml(d, l)).join('')}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
+  return `<section class="sheet">${hero({ title: 'Cards', small: true, right: navBtn('Done', 'pop') })}<div class="scroll">
+    <div class="seg" role="radiogroup" aria-label="Section"><button class="${saved ? 'on' : ''}" role="radio" aria-checked="${saved}" data-act="cardsTab" data-t="saved">My cards</button><button class="${saved ? '' : 'on'}" role="radio" aria-checked="${!saved}" data-act="cardsTab" data-t="decks">Popular decks</button></div>
+    ${body}</div>${foot}</section>`;
+}
+function cardViewLayer(l) {
+  const c = l.card, f = c.faces[l.faceIndex];
+  return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll cardview">
+    ${c.faces.length > 1 ? `<div class="seg">${c.faces.map((x, i) => `<button class="${i === l.faceIndex ? 'on' : ''}" data-act="setFace" data-i="${i}" style="font-size:14px">${esc(x.name)}</button>`).join('')}</div>` : ''}
+    ${saveBtn(c)}${factsHtml(c, f)}</div>
+    ${S.game ? `<div class="actions"><div class="group">${head('Controller')}${chipsHtml(l.controller)}</div><button class="btn ruby" style="min-height:54px;font-size:19px" data-act="acceptCard">Add to stack</button></div>` : ''}${foot}</section>`;
+}
 function detailLayer(l) {
   const it = l.item, f = it.card?.faces[it.faceIndex];
   return `<section class="sheet">${hero({ small: true, right: navBtn('Done', 'pop') })}<div class="scroll cardview">
-    ${f ? factsHtml(it.card, f) : `<div class="facts"><h2 style="font:700 24px/1.15 var(--text)">${esc(it.title)}</h2><div>${G.KIND_LABEL[it.kind]}</div></div>${it.detail ? `<div class="card-box">${esc(it.detail)}</div>` : ''}`}
+    ${it.card ? saveBtn(it.card) : ''}${f ? factsHtml(it.card, f) : `<div class="facts"><h2 style="font:700 24px/1.15 var(--text)">${esc(it.title)}</h2><div>${G.KIND_LABEL[it.kind]}</div></div>${it.detail ? `<div class="card-box">${esc(it.detail)}</div>` : ''}`}
     ${it.copiedFrom ? `<p class="note">Copy of ${esc(it.copiedFrom)}</p>` : ''}</div>${foot}</section>`;
 }
 function abilityLayer(l) {
@@ -242,7 +282,7 @@ function searchResults(l) {
   const t = l.query.trim();
   return `${l.message ? `<p class="note">${esc(l.message)}</p>` : ''}
     ${l.results.length ? `<div class="card-box results">${l.results.map(n => `<button data-act="loadCard" data-name="${esc(n)}"><span>${esc(n)}</span>${l.loading === n ? '<i class="spin"></i>' : ''}</button>`).join('')}</div>` : ''}
-    ${t ? `<div class="group"><h2 style="font:700 19px/1.2 var(--text)">Not listed?</h2>${head('Controller')}${chipsHtml(l.controller)}<button class="typed" data-act="addTyped">Add “${esc(t)}” as typed</button></div>` : '<p class="note">Type at least two letters of a card name.</p>'}`;
+    ${savingCards() ? (t ? '' : '<p class="note">Type at least two letters of a card name.</p>') : t ? `<div class="group"><h2 style="font:700 19px/1.2 var(--text)">Not listed?</h2>${head('Controller')}${chipsHtml(l.controller)}<button class="typed" data-act="addTyped">Add “${esc(t)}” as typed</button></div>` : '<p class="note">Type at least two letters of a card name.</p>'}`;
 }
 function searchLayer(l) {
   return `<section class="sheet">${hero({ small: true })}<div class="scroll">
@@ -259,7 +299,9 @@ function confirmLayer(l) {
     ${factsHtml(c, f, true)}
     ${l.readName ? '<p class="note">The printing shown may differ from the card in your hand.</p>' : ''}
     </div>
-    <div class="actions"><div class="group">${head('Controller')}${chipsHtml(l.controller)}</div><div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px"><button class="btn plain" style="min-height:54px" data-act="rejectCard">Not this card</button><button class="btn ruby" style="min-height:54px;font-size:19px" data-act="acceptCard">Add to stack</button></div></div>${foot}</section>`;
+    <div class="actions">${savingCards()
+      ? `<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px"><button class="btn plain" style="min-height:54px" data-act="rejectCard">Not this card</button><button class="btn ruby" style="min-height:54px;font-size:19px" data-act="saveAndContinue">Save card</button></div>`
+      : `<div class="group">${head('Controller')}${chipsHtml(l.controller)}</div>${saveBtn(c)}<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px"><button class="btn plain" style="min-height:54px" data-act="rejectCard">Not this card</button><button class="btn ruby" style="min-height:54px;font-size:19px" data-act="acceptCard">Add to stack</button></div>`}</div>${foot}</section>`;
 }
 function scanLayer(l) {
   const status = `<div class="scan-status" id="scanStatus" ${l.status ? '' : 'hidden'}>${scanStatusHtml(l)}</div>`;
@@ -289,7 +331,7 @@ function aboutLayer() {
     ${sect('crimson', 'What this app does', '<p>Stack Track tracks numbers and order for you. Players remain responsible for the rules, priority, targets and applying effects.</p>')}
     ${sect('sky', 'Card data', '<p>Card data and images are provided by Scryfall. Stack Track is free to use and is not produced by or endorsed by Scryfall.</p><a class="btn teal" href="https://scryfall.com" target="_blank" rel="noopener">Visit Scryfall</a>')}
     ${sect('amber', 'Legal', '<p>Stack Track is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>')}
-    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall. Your playerbase and win records stay in this browser.</p>')}<p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
+    ${sect('forest', 'Privacy', '<p>Scanning reads text on this device; camera images aren’t uploaded. Card names you look up are sent to Scryfall. Your playerbase, win records and saved cards stay in this browser.</p>')}<p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
 }
 function starterLayer(l) {
   const e = l.entries[l.cycling ?? l.selected];
@@ -311,6 +353,7 @@ function menuLayer() {
   const item = (act, c, ic_, label, cls = '') => `<button class="mitem ${cls}" role="menuitem" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span>${label}</button>`;
   return `<div class="dim" style="background:rgba(4,20,22,.35)" data-act="pop"><div class="pop" data-stop style="right:10px;width:270px;top:${y}px" role="menu">${frame}
     ${atTable ? item('backToSetup', 'o', 'sliders', 'Back to setup') : S.game ? item('resumeFromMenu', 'o', 'door', 'Resume game') : ''}
+    ${item('openCards', 't', 'layers', 'Cards &amp; decks')}
     ${item('openPlayerbase', 't', 'users', 'Playerbase')}
     ${item('openDice', 'g', 'dice', 'Dice &amp; coin')}
     ${item('openGuide', 't', 'help', 'How to use')}
@@ -340,6 +383,7 @@ function guideLayer() {
     ${sect('amber', 'Timer', ['Tap the timer to start or pause it.', 'Hold it to add or remove a minute, or to reset.'])}
     ${sect('forest', 'The stack', ['The newest item goes on top, and you resolve from the top down.', 'Swipe a row right to copy it or left to remove it.', 'Hold a row for more choices, or tap it for details.'])}
     ${sect('rose', 'Win tracking', ['Save players in Playerbase from the menu, then load them on the setup screen.', 'A player counts when their name matches a saved one.', 'When you end a game, pick the winner to record it for everyone saved.'])}
+    ${sect('sky', 'My cards', ['Open Cards &amp; decks from the menu to save cards you scan or search for.', 'During a game, tap Save to My cards on any card, or add a saved card to the stack.'])}
     ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.'])}
     </div>${foot}</section>`;
 }
@@ -405,7 +449,9 @@ function pbDeleteLayer(l) {
 }
 const LAYERS = {
   counters: countersLayer, stack: stackLayer, detail: detailLayer, ability: abilityLayer, search: searchLayer, confirm: confirmLayer,
-  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
+  scan: scanLayer, about: aboutLayer, starter: starterLayer, menu: menuLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, cards: cardsLayer, cardView: cardViewLayer,
+  cardRemove: l => { const c = S.cards.find(x => x.id === l.id); return modal(`Remove ${c?.name ?? 'card'}?`, 'It will leave My cards. You can always save it again.', `<button class="btn teal" data-act="pop">Keep</button><button class="btn ruby" data-act="removeCard">Remove</button>`); },
+  timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
   replace: () => modal('Replace the game in progress?', 'Its life totals, counters and stack will be lost.', `<button class="cta mid" data-act="startForced"><span>Start new game</span></button><button class="btn teal" data-act="pop">Cancel</button>`, true),
   endGame: endGameLayer,
 };
@@ -551,6 +597,31 @@ const A = {
     S.game = null; S.screen = 'setup'; S.layers = []; draw();
   },
   openPlayerbase() { S.layers.pop(); push({ type: 'playerbase', autofocus: 'pbName' }); },
+  openCards() { S.layers.pop(); push({ type: 'cards', tab: 'saved', filter: '' }); },
+  cardsTab(d) { const l = top(); l.tab = d.t; l.message = null; draw(); },
+  openSavedCard(d) { const card = S.cards.find(c => c.id === d.id); if (card) push({ type: 'cardView', card, faceIndex: 0, controller: S.lastController }); },
+  async openDeckCard(d) {
+    const l = top(); l.loading = d.name; l.message = null; draw();
+    try { const card = await L.cardExact(d.name); l.loading = null; if (top() === l) push({ type: 'cardView', card, faceIndex: 0, controller: S.lastController }); }
+    catch (e) { l.loading = null; l.message = e.message; if (top() === l) draw(); }
+  },
+  toggleSaved() {
+    const l = top(), card = l.card ?? l.item?.card; if (!card) return;
+    if (isSaved(card)) S.cards = S.cards.filter(c => c.id !== card.id); else S.cards.unshift(card);
+    buzz(10); draw();
+  },
+  saveAndContinue() {
+    const l = top(); if (!isSaved(l.card)) S.cards.unshift(l.card);
+    buzz(15); pop();
+    if (top()?.type === 'scan') {
+      scanModel.resume();
+      // The same card is probably still in view, so don't offer it again straight away.
+      if (l.readName) { scanModel.tried.add(l.readName); scanModel.lastFailed = l.readName; }
+      setStatus(top(), { text: `Saved ${l.card.name}. Hold up the next card, or tap Close.` });
+    } else { while (top()?.type !== 'cards') S.layers.pop(); draw(); }
+  },
+  askRemoveCard(d) { push({ type: 'cardRemove', id: d.id }); },
+  removeCard() { const l = top(); S.cards = S.cards.filter(c => c.id !== l.id); pop(); },
   openPlayerbaseLoad() {
     const seated = S.draft.seats.slice(0, S.draft.playerCount).map(s => pbFind(s.name)?.id).filter(Boolean);
     push({ type: 'playerbase', select: [...new Set(seated)] });
@@ -607,7 +678,11 @@ const A = {
     const l = top(); G.push(S.game.stack, G.stackItem('spell', l.query.trim(), '', l.controller)); S.lastController = l.controller; returnToStack();
   },
   setFace(d) { top().faceIndex = +d.i; draw(); },
-  acceptCard() { const l = top(); G.push(S.game.stack, G.spellItem(l.card, l.faceIndex, l.controller)); S.lastController = l.controller; buzz(15); returnToStack(); },
+  acceptCard() {
+    const l = top(); G.push(S.game.stack, G.spellItem(l.card, l.faceIndex, l.controller)); S.lastController = l.controller; buzz(15);
+    if (!S.layers.some(x => x.type === 'stack')) { while (S.layers.length) S.layers.pop(); push({ type: 'stack' }); return; }
+    returnToStack();
+  },
   rejectCard() { pop(); if (top()?.type === 'scan') scanModel.resume(); },
   openScan() { const l = { type: 'scan', state: 'starting', status: null }; push(l); startScan(l); },
   flipCamera() { const l = top(); S.settings.scanCamera = S.settings.scanCamera === 'user' ? 'environment' : 'user'; stopScan(); l.state = 'starting'; l.status = null; draw(); startScan(l); },
@@ -772,6 +847,7 @@ document.addEventListener('input', e => {
     l[b === 'abilitySource' ? 'source' : 'effect'] = e.target.value;
     document.getElementById('abilityAdd').disabled = !(l.source.trim() || l.effect.trim()); return;
   }
+  if (b === 'cardFilter') { l.filter = e.target.value; document.getElementById('savedCards').innerHTML = savedRows(l); return; }
   if (b === 'search') {
     l.query = e.target.value; clearTimeout(searchTimer);
     const t = l.query.trim(); l.seq = (l.seq || 0) + 1; const seq = l.seq;

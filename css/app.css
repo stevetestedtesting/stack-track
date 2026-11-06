@@ -322,6 +322,22 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .pb-pct { flex: none; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .pb-win { flex: none; font-size: .8em; font-weight: 500; opacity: .85; }
 .pb-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 6px 8px 6px 14px; text-align: left; color: var(--ink); border: 1.5px solid var(--gold); border-radius: 15px; background: rgba(255,250,232,.3); }
+.addbar.two { grid-template-columns: repeat(2, 1fr); }
+.card-row { padding: 6px 4px 6px 8px; }
+.card-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; color: inherit; }
+.card-open .thumb { width: 44px; align-self: center; }
+.card-open .thumb.blank { font-size: 18px; }
+.cards-list, .decks { display: flex; flex-direction: column; gap: 8px; }
+.deck { display: flex; flex-direction: column; gap: 6px; }
+.deck .head { gap: 8px; } .deck .head .gem { width: 26px; height: 26px; flex: none; }
+.deck h3 { font: 700 18px/1.2 var(--text); }
+.deck-meta { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.deck p { font-size: 15px; }
+.deck-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.deck-cards .btn { min-height: 40px; font-size: 14px; }
+.deck-src { font-size: 13px; color: var(--ink-soft); }
+.deck-src a { color: inherit; font-weight: 600; }
+.save-card { flex: none; min-height: 44px; }
 .pb-row.pick.on { border-color: var(--ember); border-width: 2.5px; }
 .pb-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pb-text b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

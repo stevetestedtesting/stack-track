@@ -141,3 +141,9 @@ html[data-land] .mini .seat-in { padding: 2px 24px; }
 html[data-land] .mini .press.minus { padding-left: 2px; } html[data-land] .mini .press.plus { padding-right: 2px; }
 html[data-land] .mini .life, html[data-land] .mini .life.long { font-size: min(calc(var(--ih) * .5), calc(var(--iw) * .36)); }
 html[data-land] .mini-name { font-size: 13px; }
+
+/* Cards and decks */
+html[data-land] .cards-list, html[data-land] .decks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+html[data-land] .addbar.two .btn { flex-direction: row; gap: 6px; min-height: 44px; }
+html[data-land] .sheet > .actions .save-card { min-height: 40px; }
+html[data-land] .cardview > .cardimg { align-self: start; }
