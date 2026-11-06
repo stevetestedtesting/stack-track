@@ -1,11 +1,11 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.5';
-import * as L from './lookup.js?v=2.5';
-import * as R from './recognition.js?v=2.5';
-import { DECKS, deckById } from './decks.js?v=2.5';
-import { createChance } from './dice.js?v=2.5';
+import * as G from './core.js?v=2.6';
+import * as L from './lookup.js?v=2.6';
+import * as R from './recognition.js?v=2.6';
+import { DECKS, deckById } from './decks.js?v=2.6';
+import { createChance } from './dice.js?v=2.6';
 
-const APP_VERSION = '2.5';
+const APP_VERSION = '2.6';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -28,7 +28,7 @@ const S = {
   tableDecks: load('stackside.tabledecks', []), // Decks in use: { id, by: player id or null }.
   deckCache: load('stackside.deckcache', {}), // Card records by name, so deck pages open instantly and survive a lost connection.
   cardsTab: 'decks',
-  settings: { skin: DEFAULT_SKIN, scanCamera: 'user', keepAwake: true, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
+  settings: { skin: DEFAULT_SKIN, scanCamera: 'user', keepAwake: true, portraitLock: false, vibrate: true, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, ...load('stackside.settings', {}) },
 };
 const skin = () => SKINS.find(k => k.id === S.settings.skin) ?? SKINS.find(k => k.id === DEFAULT_SKIN);
 const art = n => `assets/${skin().dir ? skin().dir + '/' : ''}${n}`;
@@ -440,6 +440,7 @@ function settingsLayer() {
       <span class="thumb" style="background-image:url('assets/${k.dir ? k.dir + '/' : ''}${k.id === 'moonspire' ? 'table-top' : 'hero'}.jpg')"></span><span class="txt"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small></span><span class="tick">${k.id === skin().id ? icon('check') : ''}</span></button>`).join('')}</div></div>
     <div class="group">${head('At the table')}<div class="card-box settings-box">
       ${sw('keepAwake', 'Keep screen awake', 'During a game')}
+      ${sw('portraitLock', 'Lock to portrait', 'Stays upright when you turn your phone. Scanning and typing still turn with it.')}
       ${sw('reduceMotion', 'Reduce motion', 'Dice and coin land without tumbling')}
       ${'vibrate' in navigator ? sw('vibrate', 'Vibration', 'On life changes and when the stack resolves') : ''}
     </div></div><p class="note center">${APP_NAME} ${VER}</p></div>${foot}</section>`;
@@ -531,6 +532,7 @@ const LAYERS = {
 
 // ---------- Rendering ----------
 function draw() {
+  if (fit()) return; // Opening or closing the scanner can change the layout, and fit has then drawn it.
   const scrolls = S.layers.map((_, i) => app.querySelector(`.layer[data-i="${i}"] .scroll`)?.scrollTop ?? 0);
   const baseScroll = app.querySelector('.base .scroll')?.scrollTop ?? 0;
   app.innerHTML = `<div class="layer base root" ${S.layers.some(l => !['starter', 'pbDelete', 'timerMenu', 'replace', 'endGame', 'rowMenu'].includes(l.type)) ? 'inert' : ''}>${S.screen === 'table' && S.game ? tableScreen() : setupScreen()}</div>` +
@@ -1032,13 +1034,17 @@ document.addEventListener('pointercancel', endPress);
 // Stack rows: swipe right copies, swipe left removes, a hold opens the menu.
 function startRowDrag(e, el) {
   const id = el.dataset.item, x0 = e.clientX, y0 = e.clientY, under = el.previousElementSibling;
-  let dx = 0, active = false, held = false, scale = stage.getBoundingClientRect().width / stage.offsetWidth || 1;
+  let dx = 0, active = false, held = false, scrolled = 0;
+  const list = el.closest('.scroll');
   const hold = setTimeout(() => { held = true; suppressClick = true; cleanup(); push({ type: 'rowMenu', id }); }, 550);
   const move = ev => {
     if (ev.pointerId !== e.pointerId) return;
-    dx = (ev.clientX - x0) / scale;
-    if (!active && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(ev.clientY - y0)) { active = true; el.classList.add('dragging'); el.setPointerCapture?.(ev.pointerId); }
-    if (Math.abs(dx) > 8 || Math.abs(ev.clientY - y0) > 8) clearTimeout(hold);
+    const [sx, sy] = toStage(ev.clientX - x0, ev.clientY - y0);
+    dx = sx / stageScale;
+    if (!active && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(sy)) { active = true; el.classList.add('dragging'); el.setPointerCapture?.(ev.pointerId); }
+    if (Math.abs(dx) > 8 || Math.abs(sy) > 8) clearTimeout(hold);
+    // Turned, browsers disagree on which way a row may scroll, so rows take every touch and scroll the list here.
+    if (turn && !active && Math.abs(sy) > 8 && list) { list.scrollTop -= sy - scrolled; scrolled = sy; }
     if (active) {
       el.style.transform = `translateX(${dx}px)`;
       under.className = `under ${dx > 0 ? 'copy' : 'rm'}`;
@@ -1048,6 +1054,7 @@ function startRowDrag(e, el) {
   const up = ev => {
     if (ev.pointerId !== e.pointerId) return;
     cleanup();
+    if (scrolled) suppressClick = true;
     if (held || !active) return;
     suppressClick = true; // Cleared by the next press, so a click that never fires can't swallow a later tap.
     el.classList.remove('dragging');
@@ -1060,30 +1067,49 @@ function startRowDrag(e, el) {
 }
 
 // ---------- Stage fit ----------
+let turn = 0, stageScale = 1; // Degrees the stage is turned to hold portrait, and its scale.
+// A finger's movement on the screen, in the stage's own directions.
+const toStage = (dx, dy) => turn ? [turn > 0 ? dy : -dy, turn > 0 ? -dx : dx] : [dx, dy];
+const isTyping = () => document.activeElement?.matches?.('textarea, input:not([type=checkbox], [type=file])');
+// A website can't stop a phone rotating, so the lock turns the stage back the other way.
+// The camera picture and the keyboard always follow the phone, so scanning and typing use the sideways layout.
+function portraitTurn() {
+  const a = typeof window.orientation === 'number' ? window.orientation : screen.orientation?.angle ?? 90;
+  return a === -90 || a === 270 ? 90 : -90;
+}
+/** Sizes the stage. Returns true if the layout changed and it has already redrawn. */
 function fit() {
   const vw = innerWidth, vh = innerHeight;
   // Width has to pass 560 as well: a keyboard can leave an upright phone wider than it is tall.
-  const land = vw > vh && vh <= 500 && vw >= 560, phone = vw <= 500 || land;
-  const w = phone ? vw : 402, h = phone ? vh : 874, s = phone ? 1 : Math.min(vw / 402, vh / 874, 1.3);
-  Object.assign(stage.style, { width: w + 'px', height: h + 'px', position: 'absolute', left: '50%', top: '50%', transform: `translate(-50%,-50%) scale(${s})` });
+  const sideways = vw > vh && vh <= 500 && vw >= 560;
+  turn = sideways && S.settings.portraitLock && !isTyping() && !S.layers.some(l => l.type === 'scan') ? portraitTurn() : 0;
+  const land = sideways && !turn, phone = vw <= 500 || sideways;
+  const w = turn ? vh : phone ? vw : 402, h = turn ? vw : phone ? vh : 874;
+  stageScale = phone ? 1 : Math.min(vw / 402, vh / 874, 1.3);
+  Object.assign(stage.style, { width: w + 'px', height: h + 'px', position: 'absolute', left: '50%', top: '50%', transform: `translate(-50%,-50%) rotate(${turn}deg) scale(${stageScale})` });
   stage.style.setProperty('--sw', w + 'px'); stage.style.setProperty('--sh', h + 'px');
   document.documentElement.toggleAttribute('data-land', land);
-  if (land === S.land) return;
+  document.documentElement.toggleAttribute('data-turned', !!turn);
+  document.documentElement.toggleAttribute('data-short', h <= 720);
+  if (land === S.land) return false;
   S.land = land;
-  if (!app.firstChild) return;
+  if (!app.firstChild) return false;
   // The table's markup differs between the two, so redraw, and keep the cursor where it was.
   const focused = document.activeElement?.id;
   draw();
   if (focused) document.getElementById(focused)?.focus();
+  return true;
 }
 addEventListener('resize', fit);
+// Wait a moment: redrawing swaps the field, and focus lands on the new one.
+for (const type of ['focusin', 'focusout']) document.addEventListener(type, () => setTimeout(fit));
 // Some phones report the old size during the rotation itself.
 addEventListener('orientationchange', () => setTimeout(fit, 250));
 // Fetch the art up front so screens don't paint in pieces.
 const preloadArt = () => ['parchment.jpg', 'teal.jpg', 'table-top.jpg', 'table-bottom.jpg', 'illo-lens.webp', 'illo-stack.webp', 'starter-card.jpg', 'frame-parchment.png', 'illo-hourglass.png', ...G.COLORS.map(c => `gem-${c}.png`)].forEach(n => { new Image().src = art(n); });
 preloadArt();
 if (skin().dir === 'moonspire') new Image().src = art('altar.jpg');
-fit(); draw();
+draw();
 document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (S.screen === 'table') wake(); checkForUpdate(); });
 // Browsers can hold old copies of this site, and GitHub Pages lets them. Games are saved, so reloading loses nothing.
 async function checkForUpdate() {

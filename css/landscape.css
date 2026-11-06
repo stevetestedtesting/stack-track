@@ -178,7 +178,7 @@ html[data-land] .sheet .srcs { margin-inline: 0; padding-inline: 0; }
 .with-life .chance-out { min-height: 62px; padding-top: 2px; }
 .with-life .chance-out b { font-size: 34px; }
 .with-life .chance-foot { margin-top: 2px; min-height: 24px; }
-@media (max-height: 720px) { .with-life .chance-title, .with-life .chance-foot { display: none; } }
+html[data-short] .with-life .chance-title, html[data-short] .with-life .chance-foot { display: none; }
 html[data-land] .with-life .chance-body { flex: 1; grid-template-columns: minmax(0, 1fr) 124px; grid-template-rows: auto auto 1fr auto; grid-template-areas: "kinds kinds" "stage who" "stage out" "go go"; column-gap: 8px; padding: 6px 8px; }
 html[data-land] .with-life .chance-title, html[data-land] .with-life .chance-hint, html[data-land] .with-life .chance-foot { display: none; }
 html[data-land] .with-life .chance-kinds { gap: 6px; }
@@ -189,3 +189,6 @@ html[data-land] .with-life .chance-top { position: absolute; top: 48px; right: 8
 html[data-land] .with-life .chance-out { margin-top: 40px; }
 html[data-land] .with-life .chance-go, html[data-land][data-skin] .with-life .chance-go { width: 100%; height: 46px; font-size: 14px; letter-spacing: 0; padding-inline: 4px; white-space: nowrap; }
 html[data-land] .with-life .chance-go span::after { display: none; }
+
+/* Locked to portrait on a phone held sideways: fit() turns the stage, so this is the upright layout */
+html[data-turned] .item { touch-action: none; }
