@@ -1,6 +1,8 @@
-// Popular decks. Descriptions and win rates are from the app owner's list; card lists come from the published lists named in `list`.
+// Popular decks. The first four use the app owner's descriptions and win rates; the rest use Magic.gg's figures. Card lists come from the published lists named in `list`.
 // `cards` holds what can go on the stack. Lands never use the stack, so they are only listed for reference.
 const UNTAPPED = { label: 'Untapped.gg', url: 'https://mtga.untapped.gg/constructed/standard/decks' };
+
+const WINRATES = { label: 'Magic.gg win rates, November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' };
 
 export const DECKS = [
   {
@@ -35,6 +37,127 @@ export const DECKS = [
     lands: [[12, 'Mountain'], [4, 'Riverpyre Verge'], [4, 'Steam Vents'], [2, 'Spirebluff Canal'], [1, 'Soulstone Sanctuary']],
     list: { label: 'Draftsim', date: 'March 2026', url: 'https://draftsim.com/decks/standard-mono-red-aggro-78/' },
     sources: [{ label: 'Reddit', url: 'https://www.reddit.com/r/magicTCG/comments/1cs4dva/the_best_decks_in_standard_mtg_right_now/' }, UNTAPPED],
+  },
+  // The most played decks at three big events in October 2026, by share of the field.
+  {
+    id: 'landfall', short: 'Mono-Green', name: 'Mono-Green Landfall', color: 'forest', format: 'Standard', winRate: '53.4% match wins, 12.7% of decks',
+    blurb: 'Ramps out extra land drops, then turns every land into counters and huge attacks.',
+    cards: [[4, 'Earthbender Ascension'], [4, "Sazh's Chocobo"], [4, 'Llanowar Elves'], [4, 'Mightform Harmonizer'], [4, 'Icetill Explorer'], [4, 'Mossborn Hydra'], [4, 'Carnivorous Cultivator'], [3, 'Sapling Nursery'], [3, 'Esper Origins']],
+    lands: [[13, 'Forest'], [4, 'Fabled Passage'], [4, 'Elven Passage'], [3, 'Ba Sing Se'], [1, 'Escape Tunnel'], [1, 'Demolition Field']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'dimirmid', short: 'Dimir Midrange', name: 'Dimir Midrange', color: 'violet', format: 'Standard', winRate: '54.5% match wins, 8.9% of decks',
+    blurb: 'Cheap evasive creatures backed by removal and counterspells, with Kaito refilling the hand.',
+    cards: [[4, 'Floodpits Drowner'], [4, 'Dream Beavers'], [4, 'Kaito, Bane of Nightmares'], [4, 'Enduring Curiosity'], [4, 'Spyglass Siren'], [3, 'Requiting Hex'], [2, 'Bitter Triumph'], [2, 'The Wondrous Wasp'], [2, 'We Say Thee Nay!'], [2, "Tishana's Tidebinder"], [2, 'Shoot the Sheriff'], [1, 'Strategic Betrayal'], [1, 'Spell Snare'], [1, 'Wan Shi Tong, Librarian'], [1, 'Yuriko, Hope from the Shadows']],
+    lands: [[4, 'Swamp'], [4, 'Island'], [4, 'Watery Grave'], [4, 'Gloomlake Verge'], [2, 'Soulstone Sanctuary'], [2, 'Restless Reef'], [2, 'Shipwreck Marsh'], [1, 'Hidden Lair']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'uldaros', short: 'Dimir Uldaros', name: 'Dimir Uldaros', color: 'violet', format: 'Standard', winRate: '49.2% match wins, 8.3% of decks',
+    blurb: 'Fills the graveyard, then uses Uldaros Theorix and Superior Spider-Man to cash it in for cards.',
+    cards: [[4, 'Deceit'], [4, 'Superior Spider-Man'], [3, 'Uldaros Theorix'], [3, 'Bitter Triumph'], [3, 'Requiting Hex'], [3, 'Seasoned Cryomancer'], [2, 'Winternight Stories'], [2, 'The Theorist, Jace Beleren'], [2, 'Theorix Charm'], [2, 'Duress'], [2, 'Overlord of the Balemurk'], [1, 'Strategic Betrayal'], [1, 'Deadly Cover-Up'], [1, 'Emeritus of Ideation'], [1, 'Spell Snare'], [1, "Vraska's Final Mercy"]],
+    lands: [[4, 'Swamp'], [4, 'Shipwreck Marsh'], [4, 'Watery Grave'], [4, 'Gloomlake Verge'], [4, 'Restless Reef'], [2, 'Undercity Sewers'], [2, 'Cavern of Souls'], [1, 'Multiversal Passage']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'spellementals', short: 'Spellementals', name: 'Izzet Spellementals', color: 'sky', format: 'Standard', winRate: '44.3% match wins, 7.5% of decks',
+    blurb: 'Cheap instants and sorceries make big Elementals affordable, and Sunderflock resets the board.',
+    cards: [[4, 'Sunderflock'], [4, 'Eddymurk Crab'], [4, 'Opt'], [4, 'Prismari Charm'], [4, 'Sleight of Hand'], [4, 'Hearth Elemental'], [3, 'Burst Lightning'], [3, 'Traumatic Critique'], [2, 'Spell Snare'], [2, 'Get Out'], [2, 'Impractical Joke'], [2, 'Winternight Stories'], [1, 'Spell Pierce'], [1, 'Flow State']],
+    lands: [[6, 'Island'], [4, 'Steam Vents'], [4, 'Spirebluff Canal'], [4, 'Riverpyre Verge'], [1, 'Stormcarved Coast'], [1, 'Multiversal Passage']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'jund', short: 'Jund Sacrifice', name: 'Jund Sacrifice', color: 'crimson', format: 'Standard', winRate: '57.6% match wins, 7.4% of decks',
+    blurb: 'Makes piles of artifact tokens, then sacrifices them to drain the opponent. Won both Magic Spotlight: Fracture events.',
+    cards: [[4, 'Greedy Freebooter'], [4, 'Obsessive Pursuit'], [4, 'Lively Dirge'], [4, 'Biotech Specialist'], [4, 'The Sackville-Bagginses'], [4, 'Gene Pollinator'], [3, 'Umbral Collar Zealot'], [3, 'Torch the Tower'], [2, 'The Misty Mountains Cold'], [2, 'Magda, the Hoardmaster'], [1, 'Smaug the Magnificent'], [1, 'Requiting Hex'], [1, 'Wolverine, Fierce Fighter'], [1, 'The Ooze']],
+    lands: [[4, 'Blooming Marsh'], [4, 'Starting Town'], [3, 'Stomping Ground'], [3, 'Blood Crypt'], [3, 'Overgrown Tomb'], [2, 'Blazemire Verge'], [1, 'Swamp'], [1, 'Forest'], [1, 'Mountain']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'lifegain', short: 'Orzhov Lifegain', name: 'Orzhov Life Gain', color: 'amber', format: 'Standard', winRate: '53.6% match wins, 6.9% of decks',
+    blurb: 'Small life gains every turn snowball into a big board and extra cards. Won Arena Championship 13.',
+    cards: [[4, 'Amalia Benavides Aguirre'], [4, 'Haliya, Guided by Light'], [4, 'Case of the Uneaten Feast'], [4, 'Lunar Convocation'], [4, 'Hinterland Sanctifier'], [4, 'Starscape Cleric'], [4, 'Enlightened Confidant'], [3, "Moseo, Vein's New Dean"], [3, 'Erode'], [2, 'Liliana the Faultless'], [1, 'Aunt May'], [1, 'Deep-Cavern Bat']],
+    lands: [[4, 'Concealed Courtyard'], [4, 'Plains'], [4, 'Godless Shrine'], [4, 'Multiversal Passage'], [4, 'Starting Town'], [1, 'Great Arashin City'], [1, 'Bleachbone Verge']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'azcontrol', short: 'Azorius Control', name: 'Azorius Control', color: 'sky', format: 'Standard', winRate: '46.6% match wins, 5.9% of decks',
+    blurb: 'Counters, sweepers and removal reach the late game, where The Theorist, Jace Beleren takes over.',
+    cards: [[4, 'Get Lost'], [4, 'The Theorist, Jace Beleren'], [4, 'Consult the Star Charts'], [4, 'Countersculpt'], [3, 'No More Lies'], [3, "Jace's Machinations"], [3, 'Seam Rip'], [2, 'Day of Judgment'], [2, 'Erode'], [2, 'Three Steps Ahead'], [2, 'Pinnacle Starcage'], [1, "Captain Marvel, Earth's Protector"]],
+    lands: [[4, 'Hallowed Fountain'], [4, 'Floodfarm Verge'], [4, 'Deserted Beach'], [3, 'Island'], [3, 'Plains'], [3, 'Petrified Hamlet'], [2, "Theorist's Sanctum"], [2, 'Meticulous Archive'], [1, 'Restless Anchorage']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'fourcontrol', short: '4-Color Control', name: 'Four-Color Control', color: 'rose', format: 'Standard', winRate: '48.8% match wins, 4.6% of decks',
+    blurb: 'Tablet of Discovery powers an early Jeskai Revelation, surrounded by removal and sweepers.',
+    cards: [[4, 'Inevitable Defeat'], [4, 'Jeskai Revelation'], [4, 'Tablet of Discovery'], [3, 'Stock Up'], [3, 'Consult the Star Charts'], [3, 'No More Lies'], [2, 'Flashback'], [2, 'Firebending Lesson'], [2, 'Lightning Helix'], [2, 'Day of Judgment'], [1, 'Together as One'], [1, 'Deadly Cover-Up'], [1, 'North Wind Avatar'], [1, 'Strategic Betrayal'], [1, 'Sear']],
+    lands: [[4, 'Great Hall of the Biblioplex'], [3, 'Steam Vents'], [2, 'Sacred Foundry'], [2, 'Blood Crypt'], [2, 'Hallowed Fountain'], [2, 'Gloomlake Verge'], [2, 'Godless Shrine'], [1, 'Plains'], [1, 'Mistrise Village'], [1, 'Shattered Sanctum'], [1, 'Island'], [1, 'Sundown Pass'], [1, 'Cori Mountain Monastery'], [1, 'Stormcarved Coast'], [1, 'Deserted Beach'], [1, 'Sunbillow Verge']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'dragons', short: 'Boros Dragons', name: 'Boros Dragons', color: 'crimson', format: 'Standard', winRate: '45.0% match wins, 3.6% of decks',
+    blurb: 'Ramps into a fast flight of Dragons, led by Sarkhan and Smaug, as early as turn three.',
+    cards: [[4, 'Momo, Friendly Flier'], [4, 'Sarkhan, Dragon Ascendant'], [4, 'Smaug the Magnificent'], [4, 'Clarion Conqueror'], [4, 'Magmatic Hellkite'], [4, 'Nova Hellkite'], [4, 'Burst Lightning'], [4, 'Voice of Victory'], [2, 'Erode'], [2, 'Twinmaw Stormbrood']],
+    lands: [[4, 'Multiversal Passage'], [4, 'Sacred Foundry'], [4, 'Sunbillow Verge'], [4, 'Inspiring Vantage'], [3, 'Maelstrom of the Spirit Dragon'], [3, 'Cavern of Souls'], [1, 'Mountain'], [1, 'Plains']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'azartifacts', short: 'Azorius Artifacts', name: 'Azorius Artifacts', color: 'sky', format: 'Standard', winRate: '54.8% match wins, 3.5% of decks',
+    blurb: 'United Battlefront finds cheap artifacts, then Simulacrum Synthesizer builds huge Constructs.',
+    cards: [[4, 'Simulacrum Synthesizer'], [4, 'Perilous Snare'], [4, 'United Battlefront'], [4, 'Cryogen Relic'], [3, 'Repurposing Bay'], [3, 'Pinnacle Starcage'], [3, 'The Mind Stone'], [2, 'Braided Net'], [2, 'Candy Trail'], [2, 'Spring-Loaded Sawblades'], [1, 'The Fire Crystal'], [1, 'White Auracite'], [1, 'The Irencrag'], [1, 'Clay-Fired Bricks'], [1, 'Torpor Orb'], [1, 'Erode']],
+    lands: [[4, 'Plains'], [4, 'Castle Doom'], [4, 'Floodfarm Verge'], [4, 'Hallowed Fountain'], [2, 'Petrified Hamlet'], [2, 'Island'], [2, 'Meticulous Archive'], [1, 'Fomori Vault']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'dwarves', short: 'Boros Dwarves', name: 'Boros Dwarves', color: 'amber', format: 'Standard', winRate: '50.2% match wins, 2.3% of decks',
+    blurb: 'Dwarves equip Leyline Axe and other gear for free and hit hard early.',
+    cards: [[4, 'Dwarven Mauler'], [4, 'Lavaspur Boots'], [4, 'Thorin, Mountain-king'], [4, "Dáin's Company"], [4, 'Kíli the Resourceful'], [4, 'Dragonfire Blade'], [4, 'Leyline Axe'], [3, 'Dwalin, Weaponmaster'], [2, 'Basilisk Collar'], [2, 'Chainsaw'], [2, 'Skateboard']],
+    lands: [[4, 'Inspiring Vantage'], [4, 'Cavern of Souls'], [4, 'The Lonely Mountain'], [4, 'Sacred Foundry'], [4, 'Sunbillow Verge'], [2, 'Plains'], [1, 'Mountain']],
+    list: { label: 'Magic.gg', date: 'November 2026', url: 'https://magic.gg/news/metagame-mentor-mapping-the-standard-frontier-before-magic-world-championship-32' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'excruciator', short: 'Excruciator', name: 'Dimir Excruciator', color: 'violet', format: 'Standard', winRate: '46.0% match wins, 1.4% of decks',
+    blurb: 'Doomsday Excruciator exiles both libraries down to six cards, then a single attack finishes it.',
+    cards: [[4, 'Deceit'], [4, 'Superior Spider-Man'], [4, 'Duress'], [4, 'Requiting Hex'], [3, 'Doomsday Excruciator'], [3, 'Bitter Triumph'], [3, 'Stock Up'], [2, 'Emeritus of Ideation'], [2, 'Winternight Stories'], [2, 'Day of Black Sun'], [1, 'Deadly Cover-Up'], [1, 'M.O.D.O.K.'], [1, 'Strategic Betrayal']],
+    lands: [[9, 'Swamp'], [4, 'Gloomlake Verge'], [4, 'Restless Reef'], [4, 'Watery Grave'], [2, 'Undercity Sewers'], [2, 'Hidden Lair'], [1, 'Cavern of Souls']],
+    list: { label: 'Magic.gg', date: 'September 2026', url: 'https://magic.gg/news/metagame-mentor-the-top-standard-decks-for-september-2026s-rcqs' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'lizards', short: 'Rakdos Lizards', name: 'Rakdos Lizards', color: 'rose', format: 'Standard', winRate: '42.9% match wins, 1.4% of decks',
+    blurb: 'Fast Lizards that reward you for making the opponent lose life.',
+    cards: [[4, 'Burst Lightning'], [4, 'Fireglass Mentor'], [4, 'Flamecache Gecko'], [3, 'Gev, Scaled Scorch'], [4, 'Hired Claw'], [3, 'Ingris Stingerquill'], [4, 'Iridescent Vinelasher'], [4, 'Master of Barbs'], [4, 'Stingerquill Charm'], [3, 'Valley Flamecaller']],
+    lands: [[4, 'Blazemire Verge'], [4, 'Blood Crypt'], [2, 'Cavern of Souls'], [3, 'Haunted Ridge'], [4, 'Mountain'], [2, 'Rockface Village'], [4, 'Swamp']],
+    list: { label: 'Magic.gg', date: 'October 2026', url: 'https://magic.gg/news/metagame-mentor-the-first-standard-results-with-reality-fracture' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'prowess', short: 'Izzet Prowess', name: 'Izzet Prowess', color: 'rose', format: 'Standard', winRate: '30.6% match wins, 1.4% of decks',
+    blurb: 'Cheap spells pump small attackers such as Slickshot Show-Off for quick damage.',
+    cards: [[2, 'Bounce Off'], [4, 'Burst Lightning'], [2, 'Eddymurk Crab'], [4, 'Elusive Otter'], [4, 'Flow State'], [2, 'Impractical Joke'], [4, 'Opt'], [4, 'Pompous Battlemage'], [2, 'Secret Identity'], [4, 'Sleight of Hand'], [4, 'Slickshot Show-Off'], [1, 'Spell Snare'], [1, 'Stock Up'], [1, 'Vibrant Outburst'], [1, 'Wild Ride']],
+    lands: [[4, 'Island'], [1, 'Mountain'], [2, 'Multiversal Passage'], [4, 'Riverpyre Verge'], [4, 'Spirebluff Canal'], [1, 'Starting Town'], [4, 'Steam Vents']],
+    list: { label: 'Magic.gg', date: 'October 2026', url: 'https://magic.gg/news/metagame-mentor-the-first-standard-results-with-reality-fracture' },
+    sources: [WINRATES],
+  },
+  {
+    id: 'monoblack', short: 'Mono-Black', name: 'Mono-Black Aggro', color: 'violet', format: 'Standard', winRate: '42.6% match wins, 1.3% of decks',
+    blurb: 'Cheap aggressive creatures backed by removal such as Shoot the Sheriff.',
+    cards: [[4, 'Forsaken Miner'], [4, 'Shoot the Sheriff'], [4, 'Desolation Prowler'], [4, 'Nighthowl Pursuer'], [4, 'Sunset Saboteur'], [4, 'Corpses of the Lost'], [4, 'Iridescent Vinelasher'], [4, 'Dissection Practice'], [3, 'Gollum, Riddle Master'], [2, 'Requiting Hex']],
+    lands: [[18, 'Swamp'], [3, 'Soulstone Sanctuary'], [2, 'Realm of Koh']],
+    list: { label: 'Magic.gg', date: 'September 2026', url: 'https://magic.gg/news/metagame-mentor-the-top-standard-decks-for-september-2026s-rcqs' },
+    sources: [WINRATES],
   },
 ];
 export const deckById = id => DECKS.find(d => d.id === id);

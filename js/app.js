@@ -1,11 +1,11 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.3';
-import * as L from './lookup.js?v=2.3';
-import * as R from './recognition.js?v=2.3';
-import { DECKS, deckById } from './decks.js?v=2.3';
-import { createChance } from './dice.js?v=2.3';
+import * as G from './core.js?v=2.4';
+import * as L from './lookup.js?v=2.4';
+import * as R from './recognition.js?v=2.4';
+import { DECKS, deckById } from './decks.js?v=2.4';
+import { createChance } from './dice.js?v=2.4';
 
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -271,6 +271,12 @@ const tableDeck = id => S.tableDecks.find(t => t.id === id);
 const playerOf = id => (S.game && id ? G.player(S.game, id) : null);
 const deckStatus = d => { const t = tableDeck(d.id); if (!t) return ''; const p = playerOf(t.by); return `<div class="deck-on">${icon('check')} In use${p ? ` by ${esc(p.name)}` : ''}</div>`; };
 const deckCount = d => d.cards.reduce((n, [c]) => n + c, 0);
+/** With this many decks a player needs to find one by name. */
+const findDecks = l => { const q = (l.deckFilter ?? '').trim().toLowerCase(); return DECKS.filter(d => d.name.toLowerCase().includes(q)); };
+const noDeck = '<p class="note center">No deck has that name.</p>';
+const deckFilterBox = (l, bind) => `<div class="searchbar"><div class="box">${icon('search')}<input id="${bind}" data-bind="${bind}" value="${esc(l.deckFilter ?? '')}" placeholder="Find a deck" autocomplete="off" aria-label="Find a deck"></div></div>`;
+const cardsDeckRows = l => findDecks(l).map(deckHtml).join('') || noDeck;
+const pickDeckRows = l => findDecks(l).map(d => `<button class="navrow ${tableDeck(d.id) ? 'picked' : ''}" data-act="pickDeckNow" data-id="${d.id}">${gem(d.color)}<span class="pb-text"><b>${esc(d.name)}</b><small>${deckCount(d)} spells and creatures</small></span>${icon(tableDeck(d.id) ? 'check' : 'chevron')}</button>`).join('') || noDeck;
 const deckHtml = d => `<article class="card-box deck">
   <button class="deck-open" data-act="openDeck" data-id="${d.id}"><span class="head">${gem(d.color)}<h3>${esc(d.name)}</h3>${icon('chevron')}</span>
   <span class="deck-meta">${esc(d.format)}${d.winRate ? ` · ${esc(d.winRate)}` : ''}</span><span class="deck-blurb">${esc(d.blurb)}</span></button>
@@ -282,7 +288,7 @@ function cardsLayer(l) {
     ? `<div class="addbar two"><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button></div>
       ${S.cards.length ? `<div class="searchbar"><div class="box">${icon('search')}<input id="cardFilter" data-bind="cardFilter" value="${esc(l.filter ?? '')}" placeholder="Find a saved card" autocomplete="off" aria-label="Find a saved card"></div></div>` : ''}
       <div id="savedCards">${savedRows(l)}</div>`
-    : `<p class="note center">Pick a deck and its cards are ready on the Stack page, with no scanning.</p><div class="decks">${DECKS.map(deckHtml).join('')}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
+    : `<p class="note center">Pick a deck and its cards are ready on the Stack page, with no scanning.</p>${deckFilterBox(l, 'deckFilter')}<div class="decks" id="deckList">${cardsDeckRows(l)}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
   return `<section class="sheet">${hero({ title: 'Cards', small: true })}<div class="scroll">
     <div class="seg" role="radiogroup" aria-label="Section"><button class="${saved ? '' : 'on'}" role="radio" aria-checked="${!saved}" data-act="cardsTab" data-t="decks">Popular decks</button><button class="${saved ? 'on' : ''}" role="radio" aria-checked="${saved}" data-act="cardsTab" data-t="saved">My cards</button></div>
     ${body}</div></section>`;
@@ -321,7 +327,7 @@ function deckPickLayer(l) {
   const sources = pickSources(), back = navBtn('Back', 'pop');
   if (!sources.length || l.choosing) return `<section class="sheet">${hero({ title: 'Pick a deck', small: true, right: back })}<div class="scroll">
     <p class="note center">Choose the decks at this table. Their cards stay ready here for the whole game.</p>
-    <div class="decks">${DECKS.map(d => `<button class="navrow ${tableDeck(d.id) ? 'picked' : ''}" data-act="pickDeckNow" data-id="${d.id}">${gem(d.color)}<span class="pb-text"><b>${esc(d.name)}</b><small>${deckCount(d)} spells and creatures</small></span>${icon(tableDeck(d.id) ? 'check' : 'chevron')}</button>`).join('')}</div></div></section>`;
+    ${deckFilterBox(l, 'deckPickFilter')}<div class="decks" id="deckList">${pickDeckRows(l)}</div></div></section>`;
   const src = sources.find(x => x.key === l.source) ?? sources[0]; l.source = src.key;
   const t = tableDeck(src.key), d = deckById(src.key);
   const by = t ? t.by : l.controller;
@@ -951,6 +957,7 @@ document.addEventListener('input', e => {
     document.getElementById('abilityAdd').disabled = !(l.source.trim() || l.effect.trim()); return;
   }
   if (b === 'pickFilter') { l.filter = e.target.value; draw(); const i = document.getElementById('pickFilter'); i?.focus(); i?.setSelectionRange(l.filter.length, l.filter.length); return; }
+  if (b === 'deckFilter' || b === 'deckPickFilter') { l.deckFilter = e.target.value; document.getElementById('deckList').innerHTML = b === 'deckFilter' ? cardsDeckRows(l) : pickDeckRows(l); return; }
   if (b === 'cardFilter') { l.filter = e.target.value; document.getElementById('savedCards').innerHTML = savedRows(l); return; }
   if (b === 'search') {
     l.query = e.target.value; clearTimeout(searchTimer);
