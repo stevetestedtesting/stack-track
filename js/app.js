@@ -1,11 +1,12 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.6';
-import * as L from './lookup.js?v=2.6';
-import * as R from './recognition.js?v=2.6';
-import { DECKS, deckById } from './decks.js?v=2.6';
-import { createChance } from './dice.js?v=2.6';
+import * as G from './core.js?v=2.7';
+import * as L from './lookup.js?v=2.7';
+import * as R from './recognition.js?v=2.7';
+import { DECKS, deckById } from './decks.js?v=2.7';
+import { createChance } from './dice.js?v=2.7';
+import * as B from './batch.js?v=2.7';
 
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -46,6 +47,7 @@ function save() {
     localStorage.setItem('stackside.playerbase', JSON.stringify(S.playerbase));
     localStorage.setItem('stackside.cards', JSON.stringify(S.cards));
     localStorage.setItem('stackside.tabledecks', JSON.stringify(S.tableDecks));
+    localStorage.setItem('stackside.batch', JSON.stringify(B.saved()));
     if (S.game) localStorage.setItem('stackside.game', JSON.stringify(S.game)); else localStorage.removeItem('stackside.game');
   } catch { /* A private window can refuse storage. The game still works until the page closes. */ }
 }
@@ -167,7 +169,7 @@ function tabBar() {
   const on = activeTab(), n = S.game?.stack.items.length ?? 0;
   const tab = (id, ic_, label, badge = '') => `<button class="tab ${on === id ? 'on' : ''}" data-act="goTab" data-t="${id}" ${on === id ? 'aria-current="page"' : ''}>${icon(ic_)}<span>${label}</span>${badge}</button>`;
   const covered = S.layers.some((l, i) => !isRoot(l, i));
-  return `<nav class="tabbar" aria-label="Main" ${covered ? 'inert' : ''}>${tab('game', 'heart', 'Game')}${tab('stack', 'layers', 'Stack', n ? `<b class="badge" aria-label="${n} on the stack">${n}</b>` : '')}${tab('cards', 'cards', 'Cards')}${tab('dice', 'dice', 'Dice')}${tab('more', 'dots', 'More')}</nav>`;
+  return `<nav class="tabbar" aria-label="Main" ${covered ? 'inert' : ''}>${tab('game', 'heart', 'Game')}${tab('stack', 'layers', 'Stack', n ? `<b class="badge" aria-label="${n} on the stack">${n}</b>` : '')}${tab('cards', 'cards', 'Cards', `<b class="badge" id="cardsBadge" ${B.items.length ? '' : 'hidden'}>${B.items.length}</b>`)}${tab('dice', 'dice', 'Dice')}${tab('more', 'dots', 'More')}</nav>`;
 }
 function moreLayer() {
   const row = (act, c, ic_, title, sub, cls = '') => `<button class="navrow ${cls}" data-act="${act}"><span class="ic ${c}">${icon(ic_)}</span><span class="pb-text"><b>${title}</b><small>${sub}</small></span>${icon('chevron')}</button>`;
@@ -247,7 +249,7 @@ function stackLayer(l) {
     : `<div class="scroll"><div class="empty"><img src="${art('illo-stack.webp')}" alt="">${divider}<h2>The stack is empty</h2><p>Pick from a deck, scan a card, search for one, or add an ability. The newest item goes on top.</p>${divider}${undo}</div></div>`;
   const [before, after] = lifeSides();
   return `<section class="sheet stack-life">${before}<div class="stack-mid">${hero({ title: 'Stack', small: true, compact: true, right: s.items.length > 1 ? navBtn(l.editing ? 'Finish' : 'Reorder', 'toggleEdit') : '' })}${main}
-    <div class="actions">${topItem ? `${undo}<button class="cta" data-act="resolve" style="font-size:${topItem.title.length > 20 ? 18 : topItem.title.length > 12 ? 21 : 25}px"><span>Resolve ${esc(topItem.title)}</span></button>` : ''}
+    <div class="actions"><div id="batchBanner">${batchBanner()}</div>${topItem ? `${undo}<button class="cta" data-act="resolve" style="font-size:${topItem.title.length > 20 ? 18 : topItem.title.length > 12 ? 21 : 25}px"><span>Resolve ${esc(topItem.title)}</span></button>` : ''}
       <div class="addbar four"><button class="btn teal" data-act="openDeckPick">${icon('cards')}Deck</button><button class="btn teal" data-act="openScan">${icon('camera')}Scan</button><button class="btn teal" data-act="openSearch">${icon('search')}Search</button><button class="btn teal" data-act="openAbility">${icon('bolt')}Ability</button></div></div></div>${after}</section>`;
 }
 const factsHtml = (card, f, short) => `${f.normal ? `<div class="cardimg ${short ? 'short' : ''}"><img src="${esc(f.normal)}" alt="${esc(f.name)} card"></div>` : ''}
@@ -289,7 +291,7 @@ function cardsLayer(l) {
       ${S.cards.length ? `<div class="searchbar"><div class="box">${icon('search')}<input id="cardFilter" data-bind="cardFilter" value="${esc(l.filter ?? '')}" placeholder="Find a saved card" autocomplete="off" aria-label="Find a saved card"></div></div>` : ''}
       <div id="savedCards">${savedRows(l)}</div>`
     : `<p class="note center">Pick a deck and its cards are ready on the Stack page, with no scanning.</p>${deckFilterBox(l, 'deckFilter')}<div class="decks" id="deckList">${cardsDeckRows(l)}</div><p class="note center">Win rates come from the linked sources and change often.</p>`;
-  return `<section class="sheet">${hero({ title: 'Cards', small: true })}<div class="scroll">
+  return `<section class="sheet">${hero({ title: 'Cards', small: true })}<div class="scroll"><div id="batchBanner">${batchBanner()}</div>
     <div class="seg" role="radiogroup" aria-label="Section"><button class="${saved ? '' : 'on'}" role="radio" aria-checked="${!saved}" data-act="cardsTab" data-t="decks">Popular decks</button><button class="${saved ? 'on' : ''}" role="radio" aria-checked="${saved}" data-act="cardsTab" data-t="saved">My cards</button></div>
     ${body}</div></section>`;
 }
@@ -368,7 +370,7 @@ function searchResults(l) {
   const t = l.query.trim();
   return `${l.message ? `<p class="note">${esc(l.message)}</p>` : ''}
     ${l.results.length ? `<div class="card-box results">${l.results.map(n => `<button data-act="loadCard" data-name="${esc(n)}"><span>${esc(n)}</span>${l.loading === n ? '<i class="spin"></i>' : ''}</button>`).join('')}</div>` : ''}
-    ${savingCards() ? (t ? '' : '<p class="note">Type at least two letters of a card name.</p>') : t ? `<div class="group"><h2 style="font:700 19px/1.2 var(--text)">Not listed?</h2>${head('Controller')}${chipsHtml(l.controller)}<button class="typed" data-act="addTyped">Add “${esc(t)}” as typed</button></div>` : '<p class="note">Type at least two letters of a card name.</p>'}`;
+    ${savingCards() || l.batchItem ? (t ? '' : '<p class="note">Type at least two letters of a card name.</p>') : t ? `<div class="group"><h2 style="font:700 19px/1.2 var(--text)">Not listed?</h2>${head('Controller')}${chipsHtml(l.controller)}<button class="typed" data-act="addTyped">Add “${esc(t)}” as typed</button></div>` : '<p class="note">Type at least two letters of a card name.</p>'}`;
 }
 function searchLayer(l) {
   return `<section class="sheet">${hero({ small: true })}<div class="scroll">
@@ -391,10 +393,18 @@ function confirmLayer(l) {
 }
 function scanLayer(l) {
   const status = `<div class="scan-status" id="scanStatus" ${l.status ? '' : 'hidden'}>${scanStatusHtml(l)}</div>`;
+  if (l.state === 'live' && l.several) {
+    return `<section class="sheet">${hero({ title: 'Scan cards', small: true, left: navBtn('Close', 'pop') })}
+      <div class="scan-live" id="scanLive"><video id="scanVideo" class="${S.settings.scanCamera === 'user' ? 'mirror' : ''}" playsinline muted autoplay></video><div class="scan-guide" id="scanGuide"></div>${status}</div>
+      <div class="actions" style="padding-top:10px"><button class="cta mid" data-act="snapCard">${icon('camera')}<span style="margin-left:10px">Snap card</span></button>
+        <button class="btn ruby" id="batchReview" data-act="openBatch">${batchReviewLabel()}</button>
+        <div class="scan-btns"><label class="btn teal">${icon('image')} Add photos<input type="file" accept="image/*" multiple id="scanFile" hidden></label><button class="btn teal" data-act="flipCamera">${icon('reset')} ${S.settings.scanCamera === 'user' ? 'Back' : 'Front'} camera</button></div>
+        <button class="btn plain" data-act="toggleSeveral">One card at a time</button></div>${foot}</section>`;
+  }
   if (l.state === 'live') {
     return `<section class="sheet">${hero({ title: 'Scan a card', small: true, left: navBtn('Close', 'pop') })}
       <div class="scan-live" id="scanLive"><video id="scanVideo" class="${S.settings.scanCamera === 'user' ? 'mirror' : ''}" playsinline muted autoplay></video><div class="scan-guide" id="scanGuide"></div>${status}</div>
-      <div class="actions" style="padding-top:10px"><button class="btn teal" data-act="flipCamera">${icon('reset')} Use ${S.settings.scanCamera === 'user' ? 'back' : 'front'} camera</button><button class="btn teal" data-act="openSearch">${icon('search')} Search by name instead</button></div>${foot}</section>`;
+      <div class="actions" style="padding-top:10px"><button class="btn teal" data-act="flipCamera">${icon('reset')} Use ${S.settings.scanCamera === 'user' ? 'back' : 'front'} camera</button><button class="btn teal" data-act="openSearch">${icon('search')} Search by name instead</button><button class="btn ruby" data-act="toggleSeveral">${icon('cards')} Scan several cards</button></div>${foot}</section>`;
   }
   const denied = l.state === 'denied', starting = l.state === 'starting';
   return `<section class="sheet">${hero({ title: 'Scan a card', small: true, left: navBtn('Close', 'pop') })}<div class="scroll">
@@ -403,8 +413,49 @@ function scanLayer(l) {
     <p class="center">${denied ? 'Allow the camera for this page in your browser settings, or search by name.' : 'Scanning needs a phone or laptop camera. You can search by name instead.'}</p>
     ${status.replace('scan-status', 'card-box center')}
     <button class="cta mid" data-act="scanSample" ${l.busy ? 'disabled' : ''}>${icon('image')}<span style="margin-left:10px">Scan a sample image</span></button>
-    <label class="filelabel">${icon('camera')} Read a photo of a card<input type="file" accept="image/*" id="scanFile"></label>
+    <label class="filelabel">${icon('camera')} Read photos of cards<input type="file" accept="image/*" multiple id="scanFile"></label>
     <button class="btn teal" data-act="openSearch">${icon('search')} Search by name instead</button></div>${foot}</section>`;
+}
+function batchLine() {
+  const { total, open, ready } = B.counts();
+  if (open) return `Reading cards: ${total - open} of ${total} done`;
+  return ready === total ? `${total} ${total === 1 ? 'card' : 'cards'} ready to review` : `${total} ${total === 1 ? 'card' : 'cards'} to review`;
+}
+const batchBanner = () => B.items.length ? `<button class="navrow batch-banner" data-act="openBatch">${B.counts().open ? '<i class="spin"></i>' : icon('cards')}<span class="pb-text"><b>${batchLine()}</b></span>${icon('chevron')}</button>` : '';
+function batchReviewLabel() { const { total, open } = B.counts(); return total ? `Review ${total} ${total === 1 ? 'card' : 'cards'}${open ? ` (${open} reading)` : ''}` : 'Snap a card to start'; }
+/** Progress outside the review page changes these few elements only, so a redraw can't disturb a dice roll or the camera. */
+function batchChanged() {
+  save();
+  if (top()?.type === 'batch') { draw(); return; }
+  const badge = document.getElementById('cardsBadge'), banner = document.getElementById('batchBanner'), review = document.getElementById('batchReview');
+  if (badge) { badge.textContent = B.items.length; badge.hidden = !B.items.length; }
+  if (banner) banner.innerHTML = batchBanner();
+  if (review) review.textContent = batchReviewLabel();
+}
+B.listen(batchChanged);
+B.restore(load('stackside.batch', []));
+function batchRow(it) {
+  const f = it.card?.faces[it.faceIndex ?? 0], photo = it.url ? `<div class="thumb"><img src="${it.url}" alt="Your picture"></div>` : '';
+  const card = f?.small ? `<div class="thumb"><img src="${esc(f.small)}" alt=""></div>` : '';
+  const fix = `<button class="btn plain" data-act="batchFix" data-id="${it.id}">${icon('search')} ${it.state === 'ready' ? 'Wrong card' : 'Find by name'}</button>`;
+  const drop = `<button class="btn plain round" data-act="batchRemove" data-id="${it.id}" aria-label="Remove this card">${icon('x')}</button>`;
+  let body = '';
+  if (it.state === 'waiting') body = '<b>Waiting…</b>';
+  else if (it.state === 'reading') body = '<b><i class="spin"></i> Reading…</b>';
+  else if (it.state === 'ready') body = `<b>${esc(it.card.name)}</b><small>${esc(it.card.setName)}</small><div class="batch-btns">${fix}</div>`;
+  else if (it.state === 'choose') body = `<b>Which card is it?</b>${it.readName ? `<small>Read “${esc(it.readName)}”</small>` : ''}<div class="batch-sug">${it.names.slice(0, 4).map(n => `<button data-act="batchPick" data-id="${it.id}" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="batch-btns">${fix}</div>`;
+  else body = `<b>Card not found</b><small>${esc(it.message)}</small><div class="batch-btns">${it.blob ? `<button class="btn plain" data-act="batchRetry" data-id="${it.id}">${icon('reset')} Try again</button>` : ''}${fix}</div>`;
+  return `<div class="batch-row ${it.state}">${photo}${card}<div class="batch-text">${body}</div>${drop}</div>`;
+}
+function batchLayer(l) {
+  const { total, open, ready } = B.counts(), n = `${ready} ${ready === 1 ? 'card' : 'cards'}`;
+  return `<section class="sheet">${hero({ title: 'Review cards', small: true, right: navBtn('Back', 'pop') })}<div class="scroll">
+    ${l.done ? `<p class="note center">${esc(l.done)}</p>` : ''}
+    ${S.game && ready ? `<div class="group">${head('Controller')}${chipsHtml(l.controller)}</div>` : ''}
+    ${total ? `<p class="note center">${open ? '<i class="spin batch-spin"></i> ' : ''}${batchLine()}. ${open ? 'You can leave this page while it reads.' : ''}</p>${B.items.map(batchRow).join('')}` : '<p class="note center">No cards left to review.</p>'}</div>
+    <div class="actions">
+      ${S.game ? `<button class="btn ruby" data-act="batchToStack" ${ready ? '' : 'disabled'}>Add ${n} to stack</button>` : ''}
+      <button class="btn ${S.game ? 'teal' : 'ruby'}" data-act="batchSave" ${ready ? '' : 'disabled'}>Save ${n} to My cards</button></div>${foot}</section>`;
 }
 function scanStatusHtml(l) {
   const st = l.status; if (!st) return '';
@@ -456,7 +507,7 @@ function guideLayer() {
     ${sect('sky', 'Decks', ['In Cards, choose a popular deck and tap Use this deck.', 'On the Stack page, tap Deck, choose who plays it once, then tap any card to cast it.', 'Lands are left out because they don\'t use the stack.'])}
     ${sect('sky', 'My cards', ['In Cards, open My cards to scan or search for cards to keep.', 'Saved cards also appear when you tap Deck on the Stack page.'])}
     ${sect('rose', 'Win tracking', ['Save names in More, under Players, then load them when setting up a game.', 'When you end a game from More, pick the winner to record it for everyone saved.'])}
-    ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.'])}
+    ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.', 'For a pile of cards, tap Scan several cards and snap each one, or add photos. They are read while you carry on, and you check them all at the end.', 'Keep the app open while cards are read. A picture not yet read is lost if the phone closes the page.'])}
     </div>${foot}</section>`;
 }
 const pbAddable = name => { const n = String(name ?? '').trim(); return n && !pbFind(n); };
@@ -525,7 +576,7 @@ const LAYERS = {
   counters: countersLayer, stack: stackLayer, detail: detailLayer, ability: abilityLayer, search: searchLayer, confirm: confirmLayer,
   scan: scanLayer, about: aboutLayer, starter: starterLayer, more: moreLayer, deck: deckLayer, deckPick: deckPickLayer, settings: settingsLayer, guide: guideLayer, dice: diceLayer, playerbase: playerbaseLayer, pbDelete: pbDeleteLayer, cards: cardsLayer, cardView: cardViewLayer,
   cardRemove: l => { const c = S.cards.find(x => x.id === l.id); return modal(`Remove ${c?.name ?? 'card'}?`, 'It will leave My cards. You can always save it again.', `<button class="btn teal" data-act="pop">Keep</button><button class="btn ruby" data-act="removeCard">Remove</button>`); },
-  timerMenu: timerMenuLayer, rowMenu: rowMenuLayer,
+  timerMenu: timerMenuLayer, rowMenu: rowMenuLayer, batch: batchLayer,
   replace: () => modal('Replace the game in progress?', 'Its life totals, counters and stack will be lost.', `<button class="cta mid" data-act="startForced"><span>Start new game</span></button><button class="btn teal" data-act="pop">Cancel</button>`, true),
   endGame: endGameLayer,
 };
@@ -784,7 +835,11 @@ const A = {
   openSearch() { if (top()?.type === 'scan') S.scanResume = true; push({ type: 'search', query: '', results: [], message: null, loading: null, controller: S.lastController, autofocus: 'searchInput' }); },
   async loadCard(d) {
     const l = top(); l.loading = d.name; renderSearch(l);
-    try { const card = await L.cardExact(d.name); l.loading = null; if (top() === l) openConfirm(card, null); }
+    try {
+      const card = await L.cardExact(d.name); l.loading = null;
+      if (top() !== l) return;
+      if (l.batchItem) { pop(); B.setChosen(l.batchItem, card); } else openConfirm(card, null);
+    }
     catch (e) { l.loading = null; l.message = e.message; if (top() === l) renderSearch(l); }
   },
   addTyped() {
@@ -800,6 +855,34 @@ const A = {
   openScan() { const l = { type: 'scan', state: 'starting', status: null }; push(l); startScan(l); },
   flipCamera() { const l = top(); S.settings.scanCamera = S.settings.scanCamera === 'user' ? 'environment' : 'user'; stopScan(); l.state = 'starting'; l.status = null; draw(); startScan(l); },
   scanSample() { runSample(top()); },
+  toggleSeveral() { const l = top(); l.several = !l.several; setStatus(l, null); scanModel.reset(); draw(); },
+  snapCard() {
+    const l = top(), c = scanCrop(); if (!c) return;
+    buzz(15);
+    document.getElementById('scanGuide')?.animate?.([{ borderColor: '#fff', opacity: .2 }, { opacity: 1 }], 220);
+    setStatus(l, { text: 'Got it. Hold up the next card.' });
+    c.toBlob(b => { if (b) B.add([b]); }, 'image/jpeg', .9);
+  },
+  openBatch() { push({ type: 'batch', controller: S.lastController }); },
+  batchRemove(d) { B.remove(d.id); },
+  batchRetry(d) { B.retry(d.id); },
+  batchPick(d) { B.choose(d.id, d.name); },
+  batchFix(d) { push({ type: 'search', query: '', results: [], message: null, loading: null, controller: S.lastController, autofocus: 'searchInput', batchItem: d.id }); },
+  batchToStack() {
+    const l = top(), ready = B.takeReady();
+    // Oldest first, so the last card scanned is on top of the stack, the same as scanning them one at a time.
+    for (const it of ready) G.push(S.game.stack, G.spellItem(it.card, it.faceIndex ?? 0, l.controller));
+    S.lastController = l.controller; buzz(15);
+    if (B.items.length) { l.done = `Added ${ready.length} to the stack.`; draw(); return; }
+    leaveBatch('stack');
+  },
+  batchSave() {
+    const l = top(), ready = B.takeReady();
+    for (const it of ready) if (!isSaved(it.card)) S.cards.unshift(it.card);
+    buzz(15);
+    if (B.items.length) { l.done = `Saved ${ready.length} to My cards.`; draw(); return; }
+    S.cardsTab = 'saved'; leaveBatch('cards');
+  },
   async chooseSuggestion(d) {
     const l = top(); setStatus(l, { text: `Looking up “${d.name}”…`, busy: true });
     try { openConfirm(await L.cardExact(d.name), d.name); setStatus(l, null); }
@@ -823,6 +906,10 @@ function openConfirm(card, readName) {
     const scores = card.faces.map(f => L.similarity(readName, f.name)); faceIndex = scores.indexOf(Math.max(...scores));
   }
   push({ type: 'confirm', card, readName, faceIndex, controller: S.lastController });
+}
+function leaveBatch(page) {
+  if (S.layers.some(l => l.type === 'scan')) stopScan();
+  S.layers = [{ type: page }]; draw();
 }
 function renderSearch(l) { const el = document.getElementById('searchResults'); if (el) el.innerHTML = searchResults(l); }
 
@@ -860,18 +947,25 @@ function attachScan() {
   Object.assign(g.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
 }
 function resumeScanIfTop() { if (top()?.type === 'scan' && S.scanResume) { S.scanResume = false; scanModel.pausedUntil = Date.now() + 1000; } }
+/** The part of the camera picture inside the guide. */
+function scanCrop() {
+  const v = document.getElementById('scanVideo'), box = document.getElementById('scanLive');
+  if (!v || !box || v.readyState < 2 || !v.videoWidth) return null;
+  const pw = box.clientWidth, ph = box.clientHeight, g = R.guideRect(pw, ph, 0.8, 0.82);
+  const s = Math.max(pw / v.videoWidth, ph / v.videoHeight), ox = (v.videoWidth * s - pw) / 2, oy = (v.videoHeight * s - ph) / 2;
+  return R.toCanvas(v, (g.x + ox) / s, (g.y + oy) / s, g.w / s, g.h / s);
+}
 async function scanFrame(l) {
   const m = scanModel, v = document.getElementById('scanVideo'), box = document.getElementById('scanLive');
+  if (l.several) return; // Several cards: nothing is read until a card is snapped.
   if (top() !== l || !v || !box || m.busy || m.found || m.suggesting || Date.now() < m.pausedUntil || v.readyState < 2) return;
   m.busy = true;
   try {
-    const pw = box.clientWidth, ph = box.clientHeight, g = R.guideRect(pw, ph, 0.8, 0.82);
-    const s = Math.max(pw / v.videoWidth, ph / v.videoHeight), ox = (v.videoWidth * s - pw) / 2, oy = (v.videoHeight * s - ph) / 2;
-    const c = R.toCanvas(v, (g.x + ox) / s, (g.y + oy) / s, g.w / s, g.h / s);
+    const c = scanCrop();
     if (!R.isReady()) setStatus(l, { text: 'Preparing the text reader…', busy: true });
     else if (!l.status) setStatus(l, { text: 'Hold a card inside the frame.' });
     const names = await R.readTitle(c);
-    if (top() !== l) return;
+    if (top() !== l || l.several) return; // Switched to several cards while this was reading.
     if (!names) { if (!l.status?.suggestions) setStatus(l, { text: 'Hold a card inside the frame.' }); return; }
     const primary = names[0];
     setStatus(l, { text: `Reading “${primary}”…`, busy: true });
@@ -882,7 +976,7 @@ async function scanFrame(l) {
       for (const name of names.filter(x => !m.tried.has(x))) {
         m.tried.add(name);
         const card = await L.quickMatch(name);
-        if (top() !== l) return;
+        if (top() !== l || l.several) return;
         if (card) { m.found = true; setStatus(l, null); openConfirm(card, name); m.stabilizer.reset(); return; }
       }
       return;
@@ -896,6 +990,7 @@ async function scanFrame(l) {
 }
 async function identifyAndShow(l, parsed, name) {
   const r = await L.identify([name, ...parsed.names.slice(1)], parsed.setCode, parsed.collectorNumber);
+  if (l.several) return;
   // Scryfall's fuzzy search will match almost anything, so a read that barely resembles the card counts as no match.
   if (r.type === 'match' && L.cardSimilarity(name, r.card) < 0.6) { scanModel.lastFailed = name; setStatus(l, { text: `Read “${name}” but found no card. Adjust the card or search by name.` }); return; }
   if (r.type === 'match') { scanModel.found = true; setStatus(l, null); if (top() === l) openConfirm(r.card, name); }
@@ -984,6 +1079,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id !== 'scanFile' || !e.target.files[0]) return;
   const file = e.target.files[0], l = top();
+  if (l.several || e.target.files.length > 1) { B.add([...e.target.files]); e.target.value = ''; A.openBatch(); return; }
   readStill(l, async () => { const bmp = await createImageBitmap(file); return R.toCanvas(bmp, 0, 0, bmp.width, bmp.height, Math.min(1400, Math.max(900, bmp.width))); });
 });
 document.addEventListener('contextmenu', e => {
@@ -1113,7 +1209,7 @@ draw();
 document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (S.screen === 'table') wake(); checkForUpdate(); });
 // Browsers can hold old copies of this site, and GitHub Pages lets them. Games are saved, so reloading loses nothing.
 async function checkForUpdate() {
-  if (S.layers.length) return;
+  if (S.layers.length || B.counts().open) return;
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
     const latest = res.ok ? (await res.json()).version : null;

@@ -5,6 +5,8 @@ export function cleanName(raw) {
   if (/[•©™]/.test(raw)) return null;
   const tokens = raw.trim().split(/\s+/);
   while (tokens.length > 1 && debris(tokens[tokens.length - 1])) tokens.pop();
+  // At the front only marks count as debris: "Y)" is the frame's edge, but "Ob" starts a real card name.
+  while (tokens.length > 1 && debris(tokens[0]) && /[^\p{L}]/u.test(tokens[0])) tokens.shift();
   const r = tokens.join(' ').replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
   const letters = (r.match(/\p{L}/gu) || []).length;
   return letters >= 3 && letters / Math.max(r.length, 1) >= 0.7 ? r : null;
@@ -63,11 +65,17 @@ function band(src, x0, y0, x1, y1, width = 1100) {
   x.putImageData(img, 0, 0);
   return c;
 }
-async function ocr(canvas, psm) {
-  const w = await worker();
-  await w.setParameters({ tessedit_pageseg_mode: psm });
-  const { data } = await w.recognize(canvas);
-  return (data.lines || []).map(l => l.text.trim()).filter(Boolean);
+// One reader, so reads take turns: the batch queue and the live camera can't change each other's settings mid-read.
+let turn = Promise.resolve();
+function ocr(canvas, psm) {
+  const read = turn.then(async () => {
+    const w = await worker();
+    await w.setParameters({ tessedit_pageseg_mode: psm });
+    const { data } = await w.recognize(canvas);
+    return (data.lines || []).map(l => l.text.trim()).filter(Boolean);
+  });
+  turn = read.catch(() => {});
+  return read;
 }
 function rotated(c) {
   const r = document.createElement('canvas'); r.width = c.height; r.height = c.width;
@@ -107,6 +115,11 @@ export async function readCard(canvas) {
   const foot = await ocr(band(canvas, .03, .895, .6, .99), '6');
   const first = fn => { for (const f of foot) { const v = fn(f); if (v) return v; } return null; };
   return { names: names.slice(0, 3), setCode: first(setCode), collectorNumber: first(collectorNumber) };
+}
+/** A second look at a card whose first read matched nothing: the wider band, which copes better with an off-centre card. */
+export async function readWide(canvas) {
+  const names = uniqueNames(await ocr(band(canvas, .02, .005, .9, .2), '6'));
+  return names.length ? names.slice(0, 3) : null;
 }
 /** Draws a source rectangle to a canvas at a size the OCR reads well. */
 export function toCanvas(src, sx, sy, sw, sh, width = 900) {

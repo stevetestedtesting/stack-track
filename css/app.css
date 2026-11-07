@@ -424,3 +424,22 @@ textarea.field { resize: none; min-height: 78px; display: block; }
 .card-row .pb-text b.wrap { white-space: normal; line-height: 1.2; }
 .costline { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-height: 18px; }
 .costline small { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Scanning several cards */
+.badge[hidden] { display: none; }
+.scan-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.scan-btns .btn { padding-inline: 6px; font-size: 14px; cursor: pointer; }
+.batch-banner { min-height: 46px; padding-block: 4px; }
+.batch-banner .spin { margin-inline: 4px; }
+.batch-spin { display: inline-block; vertical-align: -3px; }
+.batch-row { position: relative; display: flex; gap: 8px; padding: 10px; border: 1.5px solid var(--gold); border-radius: 15px; background: rgba(255,250,232,.3); }
+.batch-row .thumb { width: 54px; }
+.batch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-right: 38px; overflow-wrap: anywhere; }
+.batch-text b { font-size: 16px; line-height: 1.2; }
+.batch-text b .spin { display: inline-block; vertical-align: -3px; width: 15px; height: 15px; }
+.batch-text small { font-size: 13px; color: var(--ink-soft); }
+.batch-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.batch-btns .btn { min-height: 36px; padding-inline: 10px; font-size: 13px; }
+.batch-sug { display: flex; flex-direction: column; margin-top: 2px; }
+.batch-sug button { min-height: 38px; text-align: left; font-weight: 600; border-top: 1px solid rgba(200,152,60,.5); }
+.batch-row > .round { position: absolute; right: 6px; top: 6px; width: 34px; height: 34px; min-height: 0; padding: 0; display: grid; place-items: center; }
