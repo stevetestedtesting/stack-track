@@ -51,7 +51,7 @@ function worker() {
   }).then(() => window.Tesseract.createWorker('eng', 1, LANG_DATA)).then(w => { workerReady = true; return w; }).catch(e => { workerPromise = null; throw e; });
 }
 // Tesseract reads a whole card badly because of the artwork, so it only sees the title bar and the collector line.
-function band(src, x0, y0, x1, y1, width = 1100) {
+function band(src, x0, y0, x1, y1, width = 1100, pad = 0) {
   const sw = (x1 - x0) * src.width, sh = (y1 - y0) * src.height;
   const c = document.createElement('canvas'); c.width = width; c.height = Math.max(1, Math.round(width * sh / sw));
   const x = c.getContext('2d', { willReadFrequently: true });
@@ -63,7 +63,11 @@ function band(src, x0, y0, x1, y1, width = 1100) {
   const invert = sum / lum.length < 110, range = Math.max(1, max - min); // Black-frame footers and dark title bars carry light text.
   for (let i = 0; i < lum.length; i++) { let v = (lum[i] - min) / range * 255; if (invert) v = 255 - v; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; }
   x.putImageData(img, 0, 0);
-  return c;
+  if (!pad) return c;
+  // The reader needs a clear margin around text.
+  const o = document.createElement('canvas'); o.width = c.width + pad * 2; o.height = c.height + pad * 2;
+  const ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, o.width, o.height); ox.drawImage(c, pad, pad);
+  return o;
 }
 // One reader, so reads take turns: the batch queue and the live camera can't change each other's settings mid-read.
 let turn = Promise.resolve();
@@ -72,7 +76,7 @@ function ocr(canvas, psm) {
     const w = await worker();
     await w.setParameters({ tessedit_pageseg_mode: psm });
     const { data } = await w.recognize(canvas);
-    return (data.lines || []).map(l => l.text.trim()).filter(Boolean);
+    return (data.text || '').split('\n').map(l => l.trim()).filter(Boolean);
   });
   turn = read.catch(() => {});
   return read;
@@ -94,32 +98,44 @@ function hasDetail(canvas) {
   const n = d.length / 4;
   return Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2)) > 8;
 }
-/** The live camera's read: one pass per frame so it can retry often, switching between a wide band and the tight title bar. */
-let tightNext = false;
+/** How crisp the title bar is. Only meaningful compared with other frames, since cameras differ. */
+export function sharpness(canvas) {
+  const w = 360, h = 40, c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(canvas, .04 * canvas.width, .025 * canvas.height, .8 * canvas.width, .1 * canvas.height, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data, g = new Float32Array(w * h);
+  for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11;
+  let sum = 0, sq = 0, n = 0;
+  for (let y = 1; y < h - 1; y++) for (let i = y * w + 1, end = y * w + w - 1; i < end; i++) {
+    const l = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - w] - g[i + w];
+    sum += l; sq += l * l; n++;
+  }
+  return sq / n - (sum / n) ** 2;
+}
+// Ways to read a title, best first. In tests on 40 cards the frame's edges ruined most reads, so the first crops inside
+// them. It is small on purpose: it read as well at 450 wide as at 800, in half the time. It needs the card well placed, which the others don't.
+const readInside = async c => uniqueNames(await ocr(band(c, .05, .04, .82, .105, 450, 15), '7'));
+const readBar = async c => uniqueNames(await ocr(band(c, .04, .025, .84, .125, 800, 20), '6'));
+const readWideBand = async c => uniqueNames(await ocr(band(c, .02, .005, .9, .2, 800), '6'));
+export const TITLE_READS = [readInside, readBar, readWideBand, c => readWideBand(rotated(c))]; // The last is for split cards.
+/** The live camera's read: one pass per frame so it can retry often, mostly the quick one. */
+let liveFrame = 0;
 export async function readTitle(canvas) {
   if (workerReady && !hasDetail(canvas)) return null;
-  const tight = tightNext; tightNext = !tightNext;
-  const lines = tight ? await ocr(band(canvas, .04, .025, .84, .125, 800), '7') : await ocr(band(canvas, .02, .005, .9, .2, 800), '6');
-  const names = uniqueNames(lines);
+  const frame = liveFrame++ % 6; // Now and then a wider look, in case the card is off-centre in the frame.
+  let names = await (frame === 5 ? readWideBand : frame === 2 ? readBar : readInside)(canvas);
+  if (!names.length) names = await readBar(canvas); // The quick read can miss very short names outright.
   return names.length ? names.slice(0, 3) : null;
 }
-/** Reads one card-shaped canvas: the title bar first, a wider band if the card sits off-centre, then a quarter turn for split cards. */
+/** Reads one card-shaped canvas: the title, then its printing. */
 export async function readCard(canvas) {
-  let names = uniqueNames(await ocr(band(canvas, .04, .025, .84, .125), '7'));
-  if (!names.length) names = uniqueNames(await ocr(band(canvas, .02, .005, .9, .2), '6'));
-  if (!names.length) {
-    names = uniqueNames(await ocr(band(rotated(canvas), .02, .005, .9, .2), '6'));
-    return names.length ? { names: names.slice(0, 3), setCode: null, collectorNumber: null } : null;
-  }
+  let names = [];
+  for (const read of TITLE_READS) { names = await read(canvas); if (names.length) break; }
+  if (!names.length) return null;
   // Only worth reading once there is a name. Most of a printing's identity is in this line.
   const foot = await ocr(band(canvas, .03, .895, .6, .99), '6');
   const first = fn => { for (const f of foot) { const v = fn(f); if (v) return v; } return null; };
   return { names: names.slice(0, 3), setCode: first(setCode), collectorNumber: first(collectorNumber) };
-}
-/** A second look at a card whose first read matched nothing: the wider band, which copes better with an off-centre card. */
-export async function readWide(canvas) {
-  const names = uniqueNames(await ocr(band(canvas, .02, .005, .9, .2), '6'));
-  return names.length ? names.slice(0, 3) : null;
 }
 /** Draws a source rectangle to a canvas at a size the OCR reads well. */
 export function toCanvas(src, sx, sy, sw, sh, width = 900) {

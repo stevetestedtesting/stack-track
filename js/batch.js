@@ -1,6 +1,7 @@
 // Batch scanning: a queue of card pictures, read one at a time while the rest of the app carries on. No DOM.
-import * as R from './recognition.js?v=2.7';
-import * as L from './lookup.js?v=2.7';
+import * as R from './recognition.js?v=2.8';
+import * as L from './lookup.js?v=2.8';
+import * as N from './names.js?v=2.8';
 
 export const items = [];
 let onChange = () => {}, running = false, nextId = 1;
@@ -12,7 +13,7 @@ const faceFor = (card, read) => {
   return scores.indexOf(Math.max(...scores));
 };
 const setCard = (it, card) => Object.assign(it, { state: 'ready', card, faceIndex: faceFor(card, it.readName), names: null, message: null });
-const isOpen = it => it.state === 'waiting' || it.state === 'reading';
+const isOpen = it => it.state === 'waiting' || it.state === 'reading' || it.state === 'looking';
 
 export const counts = () => ({
   total: items.length,
@@ -24,20 +25,27 @@ async function readOne(it) {
   const bmp = await createImageBitmap(it.blob).catch(() => { throw new Error('This file could not be opened as a picture.'); });
   const c = R.toCanvas(bmp, 0, 0, bmp.width, bmp.height, Math.min(1400, Math.max(900, bmp.width)));
   bmp.close?.();
-  const parsed = await R.readCard(c);
-  if (!parsed) return { state: 'failed', message: 'No card name could be read.' };
-  const read = parsed.names[0];
+  await N.load();
+  // Only the title: much quicker than also reading the printing, and the card is the same whichever printing it is.
+  // The live camera gets many tries at a card, but a picture gets one, so keep looking until something matches.
+  const reads = [];
+  for (const read of R.TITLE_READS) { reads.push(...await read(c)); if (N.matchAny(reads)) break; }
+  if (!reads.length) return { state: 'failed', message: 'No card name could be read.' };
+  const read = reads[0];
   it.readName = read;
-  const r = await L.identify(parsed.names, parsed.setCode, parsed.collectorNumber);
+  const hit = N.matchAny(reads);
+  if (hit) return { name: hit.name, read: hit.read };
+  const r = await L.identify(reads, null, null);
   // Scryfall's fuzzy search will match almost anything, so a read that barely resembles the card counts as no match.
   if (r.type === 'match' && L.cardSimilarity(read, r.card) >= 0.6) return { card: r.card };
-  // The live camera gets many tries at a card, but a picture gets one, so give it a second look before asking the player.
-  for (const name of (await R.readWide(c)) ?? []) {
-    const card = await L.quickMatch(name);
-    if (card) { it.readName = name; return { card }; }
-  }
   if (r.type === 'suggestions') return { state: 'choose', names: r.names };
   return { state: 'failed', message: `Read “${read}” but found no card.` };
+}
+/** Fetches a named card's details alongside the reading, so the next picture doesn't wait for the network. */
+async function fetchCard(it, name) {
+  try { const card = await L.cardExact(name); if (it.state === 'looking') setCard(it, card); }
+  catch (e) { if (it.state === 'looking') Object.assign(it, { state: 'failed', message: e.message }); }
+  onChange();
 }
 async function run() {
   if (running) return;
@@ -46,7 +54,9 @@ async function run() {
     it.state = 'reading'; onChange();
     try {
       const out = await readOne(it);
-      if (out.card) setCard(it, out.card); else Object.assign(it, out);
+      if (out.name) { Object.assign(it, { state: 'looking', name: out.name, readName: out.read }); fetchCard(it, out.name); }
+      else if (out.card) setCard(it, out.card);
+      else Object.assign(it, out);
     } catch (e) { Object.assign(it, { state: 'failed', message: e.message || 'This picture could not be read.' }); }
     onChange();
   }

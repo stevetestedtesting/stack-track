@@ -1,12 +1,13 @@
 // Presentation: screens, gestures and wiring. Game rules live in core.js, cards in lookup.js, OCR in recognition.js.
-import * as G from './core.js?v=2.7';
-import * as L from './lookup.js?v=2.7';
-import * as R from './recognition.js?v=2.7';
-import { DECKS, deckById } from './decks.js?v=2.7';
-import { createChance } from './dice.js?v=2.7';
-import * as B from './batch.js?v=2.7';
+import * as G from './core.js?v=2.8';
+import * as L from './lookup.js?v=2.8';
+import * as R from './recognition.js?v=2.8';
+import { DECKS, deckById } from './decks.js?v=2.8';
+import { createChance } from './dice.js?v=2.8';
+import * as B from './batch.js?v=2.8';
+import * as N from './names.js?v=2.8';
 
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 const APP_NAME = 'Stack Track';
 const VER = `v${APP_VERSION}`;
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -441,6 +442,7 @@ function batchRow(it) {
   const drop = `<button class="btn plain round" data-act="batchRemove" data-id="${it.id}" aria-label="Remove this card">${icon('x')}</button>`;
   let body = '';
   if (it.state === 'waiting') body = '<b>Waiting…</b>';
+  else if (it.state === 'looking') body = `<b>${esc(it.name)}</b><small><i class="spin batch-spin"></i> Getting the card…</small>`;
   else if (it.state === 'reading') body = '<b><i class="spin"></i> Reading…</b>';
   else if (it.state === 'ready') body = `<b>${esc(it.card.name)}</b><small>${esc(it.card.setName)}</small><div class="batch-btns">${fix}</div>`;
   else if (it.state === 'choose') body = `<b>Which card is it?</b>${it.readName ? `<small>Read “${esc(it.readName)}”</small>` : ''}<div class="batch-sug">${it.names.slice(0, 4).map(n => `<button data-act="batchPick" data-id="${it.id}" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="batch-btns">${fix}</div>`;
@@ -451,6 +453,7 @@ function batchLayer(l) {
   const { total, open, ready } = B.counts(), n = `${ready} ${ready === 1 ? 'card' : 'cards'}`;
   return `<section class="sheet">${hero({ title: 'Review cards', small: true, right: navBtn('Back', 'pop') })}<div class="scroll">
     ${l.done ? `<p class="note center">${esc(l.done)}</p>` : ''}
+    ${ready ? '<p class="note center">The printing shown may differ from the card in your hand.</p>' : ''}
     ${S.game && ready ? `<div class="group">${head('Controller')}${chipsHtml(l.controller)}</div>` : ''}
     ${total ? `<p class="note center">${open ? '<i class="spin batch-spin"></i> ' : ''}${batchLine()}. ${open ? 'You can leave this page while it reads.' : ''}</p>${B.items.map(batchRow).join('')}` : '<p class="note center">No cards left to review.</p>'}</div>
     <div class="actions">
@@ -507,7 +510,7 @@ function guideLayer() {
     ${sect('sky', 'Decks', ['In Cards, choose a popular deck and tap Use this deck.', 'On the Stack page, tap Deck, choose who plays it once, then tap any card to cast it.', 'Lands are left out because they don\'t use the stack.'])}
     ${sect('sky', 'My cards', ['In Cards, open My cards to scan or search for cards to keep.', 'Saved cards also appear when you tap Deck on the Stack page.'])}
     ${sect('rose', 'Win tracking', ['Save names in More, under Players, then load them when setting up a game.', 'When you end a game from More, pick the winner to record it for everyone saved.'])}
-    ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.', 'For a pile of cards, tap Scan several cards and snap each one, or add photos. They are read while you carry on, and you check them all at the end.', 'Keep the app open while cards are read. A picture not yet read is lost if the phone closes the page.'])}
+    ${sect('violet', 'Scanning', ['Hold the card flat in the frame with its name at the top.', 'You confirm every match before it joins the stack.', 'If a scan struggles, use Search instead.', 'Hold steady when it asks: blurry frames are skipped.', 'For a pile of cards, tap Scan several cards and snap each one, or add photos. They are read while you carry on, and you check them all at the end.', 'Keep the app open while cards are read. A picture not yet read is lost if the phone closes the page.'])}
     </div>${foot}</section>`;
 }
 const pbAddable = name => { const n = String(name ?? '').trim(); return n && !pbFind(n); };
@@ -704,7 +707,7 @@ const A = {
     if (activeTab() === d.t) { S.layers = S.layers.slice(0, 1); draw(); return; }
     S.layers = [d.t === 'dice' ? { type: 'dice', kind: 'd6' } : d.t === 'cards' ? { type: 'cards', filter: '' } : { type: d.t }];
     draw();
-    if (d.t === 'stack' && S.game) R.warmUp();
+    if (d.t === 'stack' && S.game) { R.warmUp(); N.load(); }
   },
   openAbout() { push({ type: 'about' }); },
   openSettings() { push({ type: 'settings' }); },
@@ -852,7 +855,7 @@ const A = {
     returnToStack();
   },
   rejectCard() { pop(); if (top()?.type === 'scan') scanModel.resume(); },
-  openScan() { const l = { type: 'scan', state: 'starting', status: null }; push(l); startScan(l); },
+  openScan() { R.warmUp(); N.load(); const l = { type: 'scan', state: 'starting', status: null }; push(l); startScan(l); },
   flipCamera() { const l = top(); S.settings.scanCamera = S.settings.scanCamera === 'user' ? 'environment' : 'user'; stopScan(); l.state = 'starting'; l.status = null; draw(); startScan(l); },
   scanSample() { runSample(top()); },
   toggleSeveral() { const l = top(); l.several = !l.several; setStatus(l, null); scanModel.reset(); draw(); },
@@ -861,7 +864,15 @@ const A = {
     buzz(15);
     document.getElementById('scanGuide')?.animate?.([{ borderColor: '#fff', opacity: .2 }, { opacity: 1 }], 220);
     setStatus(l, { text: 'Got it. Hold up the next card.' });
-    c.toBlob(b => { if (b) B.add([b]); }, 'image/jpeg', .9);
+    // A tap shakes the phone, so look at a few frames and keep the crispest.
+    let best = c, bestScore = R.sharpness(c), frames = 0;
+    const next = setInterval(() => {
+      const f = scanCrop(), score = f ? R.sharpness(f) : 0;
+      if (score > bestScore) { best = f; bestScore = score; }
+      if (++frames < 3) return;
+      clearInterval(next);
+      best.toBlob(b => { if (b) B.add([b]); }, 'image/jpeg', .9);
+    }, 120);
   },
   openBatch() { push({ type: 'batch', controller: S.lastController }); },
   batchRemove(d) { B.remove(d.id); },
@@ -916,7 +927,13 @@ function renderSearch(l) { const el = document.getElementById('searchResults'); 
 // ---------- Scan wiring: camera frames in, OCR, then lookup ----------
 const scanModel = {
   stabilizer: new R.NameStabilizer(), tried: new Set(), pausedUntil: 0, busy: false, lastFailed: null, found: false, suggesting: false,
-  reset() { this.stabilizer.reset(); this.tried.clear(); this.lastFailed = null; this.found = false; this.suggesting = false; this.busy = false; this.pausedUntil = 0; },
+  reset() { this.stabilizer.reset(); this.tried.clear(); this.lastFailed = null; this.lastFound = null; this.found = false; this.suggesting = false; this.busy = false; this.pausedUntil = 0; this.sharp = []; this.skipped = 0; },
+  /** Cameras differ, so a frame counts as blurry against recent frames. A soft camera must still get read, so skips run out. */
+  isBlurry(score) {
+    this.sharp.push(score); if (this.sharp.length > 12) this.sharp.shift();
+    if (score >= Math.max(...this.sharp) * .5 || this.skipped >= 7) { this.skipped = 0; return false; }
+    this.skipped++; return true;
+  },
   resume() { this.found = false; this.suggesting = false; this.lastFailed = null; this.stabilizer.reset(); this.tried.clear(); this.pausedUntil = Date.now() + 1500; const l = top(); if (l?.type === 'scan') setStatus(l, null); },
 };
 let scanStream = null, scanTimer = null;
@@ -964,15 +981,29 @@ async function scanFrame(l) {
     const c = scanCrop();
     if (!R.isReady()) setStatus(l, { text: 'Preparing the text reader…', busy: true });
     else if (!l.status) setStatus(l, { text: 'Hold a card inside the frame.' });
+    if (R.isReady() && m.isBlurry(R.sharpness(c))) { if (!l.status?.suggestions) setStatus(l, { text: 'Hold steady…' }); return; }
     const names = await R.readTitle(c);
     if (top() !== l || l.several) return; // Switched to several cards while this was reading.
-    if (!names) { if (!l.status?.suggestions) setStatus(l, { text: 'Hold a card inside the frame.' }); return; }
+    if (!names) { m.lastFound = null; if (!l.status?.suggestions) setStatus(l, { text: 'Hold a card inside the frame.' }); return; }
+    const hit = N.matchAny(names);
+    if (hit && hit.name === m.lastFound) return; // The card just dealt with is still in view.
+    if (hit) {
+      m.found = true; m.lastFound = hit.name;
+      setStatus(l, { text: `Found ${hit.name}…`, busy: true });
+      buzz(10);
+      const card = await L.cardExact(hit.name).catch(() => null);
+      if (top() !== l || l.several) { m.found = false; return; }
+      if (card) { setStatus(l, null); openConfirm(card, hit.read); m.stabilizer.reset(); return; }
+      m.found = false; m.lastFound = null; m.pausedUntil = Date.now() + 3000; setStatus(l, { text: 'Can’t reach Scryfall. Check the connection.' });
+      return;
+    }
     const primary = names[0];
     setStatus(l, { text: `Reading “${primary}”…`, busy: true });
     const stable = m.stabilizer.add(primary);
     if (stable === m.lastFailed) return;
     // One clear read is enough when it closely matches a real card. Anything vaguer waits for a second read.
     if (!stable) {
+      if (N.isLoaded()) return; // The list has already said nothing is close, so don't ask Scryfall too.
       for (const name of names.filter(x => !m.tried.has(x))) {
         m.tried.add(name);
         const card = await L.quickMatch(name);
